@@ -1,0 +1,26 @@
+schema: spec-driven-with-adr
+
+context: |
+  Project: Bannerfall — roguelike de gestión militar sobre Reddit / Devvit Web.
+  Tech stack: TypeScript, Node.js 22+, @devvit/web (server/client/shared), Redis gestionado por Devvit.
+  Client: Phaser o React en webview, sin autoridad sobre el estado.
+  Platform limits: request <= 30s, payload <= 4MB, response <= 10MB, serverless sin estado en proceso.
+  Integrity rule: el cliente nunca decide estado; el servidor computa o re-simula con motor determinista.
+  Testing: Vitest. Las pruebas de determinismo (replay) son obligatorias para simulation-engine.
+
+rules:
+  proposal:
+    - Declarar explicitamente "in scope" y "out of scope".
+    - Indicar impacto en runs ya acunadas (generales son inmutables: nunca migrar in place).
+  specs:
+    - Usar formato GIVEN/WHEN/THEN; cada escenario debe ser testeable.
+    - Incluir entre 3 y 5 escenarios happy path y entre 3 y 5 sad path por capability.
+    - Las specs describen comportamiento observable, no comandos de Redis ni nombres de claves.
+  design:
+    - Mantener aqui todo detalle de implementacion (claves Redis, ops atomicas, TTL).
+    - Respetar los limites de plataforma (30s / 4MB / 10MB).
+  tasks:
+    - Trozos pequenos, implementables, ordenados por dependencia.
+  adr:
+    - Formato Status / Context / Decision / Consequences / Alternatives.
+    - Cubrir manejo de conexiones, concurrencia y acceso a Redis de forma explicita.
