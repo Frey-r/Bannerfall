@@ -1,5 +1,5 @@
 /* ============================================================
-   Bannerfall — Registro central de sprites (UI)
+   Tiny Tacticians — Registro central de sprites (UI)
    Importa los PNG del pack para que Vite los empaquete y nos
    devuelva URLs hasheadas. El resto de la app consume estos
    helpers en vez de rutas crudas.
@@ -44,12 +44,22 @@ export const AVATARS = Object.keys(avatarModules)
 
 // Hash estable de una cadena -> índice de avatar. Así un mismo
 // consejero/general siempre muestra el mismo retrato.
-export function avatarFor(seed: string): string {
+function avatarIndex(seed: string): number {
   let h = 0;
   for (let i = 0; i < seed.length; i++) {
     h = (h * 31 + seed.charCodeAt(i)) | 0;
   }
-  return AVATARS[Math.abs(h) % AVATARS.length];
+  return Math.abs(h) % AVATARS.length;
+}
+
+export function avatarFor(seed: string): string {
+  return AVATARS[avatarIndex(seed)];
+}
+
+// Clave de textura Phaser ('avatar_<n>') para el mismo hash estable.
+// Los avatares se registran con estas claves en BootScene.
+export function avatarKeyFor(seed: string): string {
+  return `avatar_${avatarIndex(seed)}`;
 }
 
 /* ---- Paneles nine-slice (border-image) ------------------------- */

@@ -48,6 +48,8 @@ export const localContextStorage = new AsyncLocalStorage<DevvitContext>();
 
 const isTest = process.env.NODE_ENV === 'test';
 const isDev = process.env.IS_DEV === 'true' || !process.env.NODE_ENV;
+// Production = running inside the Devvit serverless runtime (NODE_ENV set, not dev/test).
+const isProd = !isTest && !isDev;
 
 // In-Memory mock for tests and offline dev fallback
 class InMemoryRedis implements DevvitRedis {
@@ -238,7 +240,7 @@ if (isDev && !isTest) {
     
     localRedis.on('error', (err) => {
       if (!useInMemoryFallback) {
-        console.warn('\n⚠️ [Bannerfall Dev] Local Redis connection failed. Falling back to self-contained InMemoryRedis for session.');
+        console.warn('\n⚠️ [Tiny Tacticians Dev] Local Redis connection failed. Falling back to self-contained InMemoryRedis for session.');
         useInMemoryFallback = true;
       }
     });
@@ -258,8 +260,9 @@ function parseWithScores(raw: string[]): { member: string; score: number }[] {
   return result;
 }
 
-// Proxy Redis implementation with automatic try-catch-retry fallback
-export const redis: DevvitRedis = {
+// Local-dev / test Redis implementation with automatic try-catch-retry fallback
+// (ioredis when reachable, otherwise the in-memory mock). NOT used in production.
+const localRedisProxy: DevvitRedis = {
   async get(key: string) {
     if (useInMemoryFallback) return await testRedis.get(key);
     try {
@@ -476,6 +479,154 @@ export const redis: DevvitRedis = {
     }
   }
 };
+
+// ---------------------------------------------------------------------------
+// Production Redis — delegates to the real Devvit-managed Redis (@devvit/web/server).
+// The local DevvitRedis interface differs from Devvit's RedisClient, so we adapt:
+//   • missing values: Devvit returns `undefined`, the interface expects `null`
+//   • `set` expiration: callers pass a number of seconds (TTL); Devvit wants a Date
+//   • transactions: the interface does redis.watch() → redis.multi() → txn.exec(),
+//     whereas Devvit returns a TxClient from watch() that you call multi()/exec() on.
+// ---------------------------------------------------------------------------
+
+type DevvitTxClient = Awaited<ReturnType<typeof webServer.redis.watch>>;
+
+// Devvit's SetOptions only accepts an absolute Date for expiration, while local
+// callers pass a TTL in seconds. Convert seconds → absolute Date.
+function toDevvitSetOptions(
+  options?: { expiration?: number | Date; nx?: boolean }
+): { nx?: boolean; expiration?: Date } | undefined {
+  if (!options) return undefined;
+  const out: { nx?: boolean; expiration?: Date } = {};
+  if (options.nx) out.nx = true;
+  if (options.expiration != null) {
+    out.expiration =
+      options.expiration instanceof Date
+        ? options.expiration
+        : new Date(Date.now() + options.expiration * 1000);
+  }
+  return out;
+}
+
+// Holds the TxClient between a watch() call and the following multi()/exec().
+// Devvit handles one request per stateless isolate, so a module-level handle is
+// safe for the sequential watch → multi → exec flow used by the reward routines.
+let currentTxClient: DevvitTxClient | null = null;
+
+const devvitRedisProxy: DevvitRedis = {
+  async get(key) {
+    return (await webServer.redis.get(key)) ?? null;
+  },
+  async set(key, value, options) {
+    await webServer.redis.set(key, value, toDevvitSetOptions(options));
+  },
+  async del(key) {
+    const keys = Array.isArray(key) ? key : [key];
+    if (keys.length === 0) return 0;
+    await webServer.redis.del(...keys);
+    // Devvit's del() resolves void; report the requested count as a best effort.
+    return keys.length;
+  },
+  async hGet(key, field) {
+    return (await webServer.redis.hGet(key, field)) ?? null;
+  },
+  async hSet(key, fieldValues) {
+    return await webServer.redis.hSet(key, fieldValues);
+  },
+  async hIncrBy(key, field, increment) {
+    return await webServer.redis.hIncrBy(key, field, increment);
+  },
+  async zAdd(key, ...members) {
+    if (members.length === 0) return 0;
+    return await webServer.redis.zAdd(key, ...members);
+  },
+  async zIncrBy(key, member, increment) {
+    return await webServer.redis.zIncrBy(key, member, increment);
+  },
+  async zCard(key) {
+    return await webServer.redis.zCard(key);
+  },
+  async zRemRangeByRank(key, start, stop) {
+    return await webServer.redis.zRemRangeByRank(key, start, stop);
+  },
+  async zRange(key, start, stop, options) {
+    // No `by` means range-by-index, which Devvit expresses as `by: 'rank'`.
+    return await webServer.redis.zRange(key, start, stop, {
+      by: options?.by ?? 'rank',
+      reverse: options?.reverse,
+    });
+  },
+  async zRangeByScore(key, min, max, options) {
+    // Devvit has no zRangeByScore — it is zRange with `by: 'score'`.
+    return await webServer.redis.zRange(key, min, max, {
+      by: 'score',
+      ...(options?.limit ? { limit: options.limit } : {}),
+    });
+  },
+  async watch(key) {
+    const keys = Array.isArray(key) ? key : [key];
+    currentTxClient = await webServer.redis.watch(...keys);
+    return 'OK';
+  },
+  async unwatch() {
+    const tx = currentTxClient;
+    currentTxClient = null;
+    if (tx) await tx.unwatch();
+    return 'OK';
+  },
+  multi() {
+    // Capture the TxClient opened by the preceding watch(); each transaction must
+    // be preceded by its own watch(), so consume and clear the handle here.
+    const tx = currentTxClient;
+    currentTxClient = null;
+    const queue: ((t: DevvitTxClient) => Promise<unknown>)[] = [];
+    const txn: DevvitTxn = {
+      set(k, v, opts) {
+        queue.push((t) => t.set(k, v, toDevvitSetOptions(opts)));
+        return txn;
+      },
+      hSet(k, fvs) {
+        queue.push((t) => t.hSet(k, fvs));
+        return txn;
+      },
+      hIncrBy(k, f, inc) {
+        queue.push((t) => t.hIncrBy(k, f, inc));
+        return txn;
+      },
+      zAdd(k, ...mbs) {
+        queue.push((t) => t.zAdd(k, ...mbs));
+        return txn;
+      },
+      async exec() {
+        if (!tx) {
+          throw new Error(
+            'Tiny Tacticians: redis.multi() called without a preceding redis.watch().'
+          );
+        }
+        try {
+          await tx.multi();
+          for (const op of queue) await op(tx);
+          const res = await tx.exec();
+          return res ?? [];
+        } catch (err) {
+          // A modified WATCHed key aborts the transaction. Depending on the runtime
+          // this surfaces as a thrown error or a null EXEC reply; either way we return
+          // an empty result so the caller's optimistic-retry loop re-runs.
+          console.warn(
+            'Tiny Tacticians: redis transaction aborted (conflict), signalling retry:',
+            err
+          );
+          return [];
+        }
+      },
+    };
+    return txn;
+  },
+};
+
+// Dev/test → local proxy (ioredis or in-memory). Production → Devvit-managed Redis,
+// so game state actually persists across stateless serverless invocations.
+export const redis: DevvitRedis = isProd ? devvitRedisProxy : localRedisProxy;
 
 // Proxy Context implementation
 export const context: DevvitContext = new Proxy({} as DevvitContext, {

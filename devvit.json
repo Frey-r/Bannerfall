@@ -1,6 +1,6 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
-  "name": "bannerfall",
+  "name": "tiny-tacticians",
   "post": {
     "dir": "dist/client",
     "entrypoints": {
@@ -15,6 +15,25 @@
     "entry": "index.cjs"
   },
   "permissions": {
-    "reddit": { "enable": true }
+    "reddit": {
+      "enable": true
+    }
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Crear post de Tiny Tacticians",
+        "description": "Publica un nuevo tablero jugable de Tiny Tacticians",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/create-post"
+      }
+    ]
+  },
+  "triggers": {
+    "onAppInstall": "/internal/on-install"
+  },
+  "dev": {
+    "subreddit": "tiny_tacticians_dev"
   }
 }

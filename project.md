@@ -1,4 +1,4 @@
-# Project: Bannerfall (working title)
+# Project: Tiny Tacticians (working title)
 
 Roguelike de gestión militar para **Reddit / Devvit Web**. El jugador entrena a un
 general en runs cortas (8 turnos, 3 stats), lo "acuña" como entidad inmutable y lo

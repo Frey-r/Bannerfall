@@ -1,0 +1,194 @@
+/* ============================================================
+   CollectionScene — pestañas Consejeros / Generales.
+   Subir nivel de consejero (POST /api/consejeros/:id/level) y
+   enviar generales a la arena.
+   ============================================================ */
+import Phaser from 'phaser';
+import { COLORS, GAME_W, GAME_H } from '../ui/theme.ts';
+import {
+  screenTopbar,
+  retroButton,
+  retroPanel,
+  titleText,
+  bodyText,
+  portrait,
+  affinityColor,
+  loadingOverlay,
+  toast,
+} from '../ui/widgets.ts';
+import { store, loadUserData } from '../state.ts';
+import { api } from '../api.ts';
+import { tierLetter } from '../util.ts';
+import type { BattleResult, Consejero } from '../../shared/types/index.ts';
+
+export class CollectionScene extends Phaser.Scene {
+  private tab: 'consejeros' | 'generales' = 'consejeros';
+  private dyn?: Phaser.GameObjects.Container;
+  private modal?: Phaser.GameObjects.Container;
+
+  constructor() {
+    super('Collection');
+  }
+
+  async create(): Promise<void> {
+    this.cameras.main.setBackgroundColor(COLORS.screen);
+    screenTopbar(this, 'Colección', () => this.scene.start('Home'));
+    if (store.advisors.length === 0 && store.generals.length === 0) {
+      const hide = loadingOverlay(this, 'CARGANDO...');
+      try {
+        await loadUserData();
+      } catch {
+        /* ignore */
+      }
+      hide();
+    }
+    this.render();
+  }
+
+  private render(): void {
+    this.dyn?.destroy();
+    const c = this.add.container(0, 0);
+    this.dyn = c;
+
+    c.add(
+      retroButton(this, GAME_W / 2 - 160, 110, '[ CONSEJEROS ]', {
+        variant: this.tab === 'consejeros' ? 'lime' : 'grey',
+        width: 300,
+        fontSize: 13,
+        onClick: () => {
+          this.tab = 'consejeros';
+          this.render();
+        },
+      })
+    );
+    c.add(
+      retroButton(this, GAME_W / 2 + 160, 110, '[ GENERALES ]', {
+        variant: this.tab === 'generales' ? 'lime' : 'grey',
+        width: 300,
+        fontSize: 13,
+        onClick: () => {
+          this.tab = 'generales';
+          this.render();
+        },
+      })
+    );
+
+    if (this.tab === 'consejeros') this.renderAdvisors(c);
+    else this.renderGenerals(c);
+  }
+
+  private renderAdvisors(c: Phaser.GameObjects.Container): void {
+    c.add(bodyText(this, GAME_W / 2, 170, `Consejeros ${store.advisors.length} / 12`, 15, COLORS.cream));
+    const cols = 4;
+    const x0 = GAME_W / 2 - ((cols - 1) * 200) / 2;
+    store.advisors.slice(0, 12).forEach((adv, i) => {
+      const cx = x0 + (i % cols) * 200;
+      const cy = 270 + Math.floor(i / cols) * 165;
+      const card = this.add.container(cx, cy);
+      card.add(this.add.rectangle(0, 0, 160, 145, COLORS.card2).setStrokeStyle(3, COLORS.border));
+      card.add(portrait(this, 0, -18, adv.id, 68, affinityColor(adv.affinity)));
+      card.add(bodyText(this, 0, 38, adv.name.split(' ')[0], 13, COLORS.ink));
+      card.add(bodyText(this, 0, 58, `${adv.affinity} · Lv${adv.level}`, 12, COLORS.ink));
+      card.setSize(160, 145).setInteractive(new Phaser.Geom.Rectangle(-80, -72, 160, 145), Phaser.Geom.Rectangle.Contains);
+      if (card.input) card.input.cursor = 'pointer';
+      card.on('pointerdown', () => this.openUpgrade(adv));
+      c.add(card);
+    });
+    c.add(bodyText(this, GAME_W / 2, GAME_H - 50, 'Toca un consejero para subir su nivel (gasta oro).', 12, COLORS.cream));
+  }
+
+  private renderGenerals(c: Phaser.GameObjects.Container): void {
+    c.add(bodyText(this, GAME_W / 2, 170, `Generales acuñados (${store.generals.length})`, 15, COLORS.cream));
+    if (store.generals.length === 0) {
+      c.add(bodyText(this, GAME_W / 2, 360, 'Sin generales. ¡Corre una run para reclutar!', 14, COLORS.cream));
+      return;
+    }
+    store.generals.slice(0, 6).forEach((g, i) => {
+      const ry = 250 + i * 80;
+      c.add(retroPanel(this, GAME_W / 2, ry, 900, 70, COLORS.card));
+      c.add(portrait(this, GAME_W / 2 - 410, ry, g.id, 56, affinityColor('OFE')));
+      c.add(bodyText(this, GAME_W / 2 - 360, ry - 12, g.name, 15, COLORS.ink).setOrigin(0, 0.5));
+      c.add(
+        bodyText(this, GAME_W / 2 - 360, ry + 14, `Tier ${tierLetter(g.tier)} · Poder ${g.power} · ${g.stats.ofe}/${g.stats.def}/${g.stats.man}`, 12, COLORS.ink).setOrigin(0, 0.5)
+      );
+      c.add(
+        retroButton(this, GAME_W / 2 + 230, ry, '⚔ COMBATIR', {
+          width: 200,
+          height: 52,
+          fontSize: 12,
+          onClick: () => this.battle(g.id),
+        })
+      );
+      c.add(
+        retroButton(this, GAME_W / 2 + 400, ry, 'ARENA', {
+          variant: 'grey',
+          width: 130,
+          height: 52,
+          fontSize: 12,
+          onClick: () => this.scene.start('Pvp', { selectedGeneralId: g.id }),
+        })
+      );
+    });
+  }
+
+  private openUpgrade(adv: Consejero): void {
+    this.modal?.destroy();
+    const cost = adv.level * 150;
+    const gold = store.profile?.gold ?? 0;
+    const m = this.add.container(0, 0).setDepth(100);
+    this.modal = m;
+    m.add(this.add.rectangle(0, 0, GAME_W, GAME_H, 0x0a0806, 0.72).setOrigin(0, 0).setInteractive());
+    m.add(retroPanel(this, GAME_W / 2, GAME_H / 2, 460, 420, COLORS.panelDark));
+    m.add(portrait(this, GAME_W / 2, GAME_H / 2 - 120, adv.id, 90, affinityColor(adv.affinity)));
+    m.add(titleText(this, GAME_W / 2, GAME_H / 2 - 40, adv.name, 16, COLORS.cream));
+    m.add(bodyText(this, GAME_W / 2, GAME_H / 2, `Nivel ${adv.level} · Afinidad ${adv.affinity}`, 14, COLORS.cream));
+    m.add(titleText(this, GAME_W / 2, GAME_H / 2 + 50, `Costo: ${cost} oro`, 14, COLORS.gold));
+    m.add(
+      retroButton(this, GAME_W / 2 - 100, GAME_H / 2 + 130, 'MEJORAR', {
+        width: 180,
+        fontSize: 13,
+        enabled: gold >= cost,
+        onClick: () => this.levelUp(adv),
+      })
+    );
+    m.add(
+      retroButton(this, GAME_W / 2 + 100, GAME_H / 2 + 130, 'CERRAR', {
+        variant: 'grey',
+        width: 180,
+        fontSize: 13,
+        onClick: () => {
+          this.modal?.destroy();
+          this.modal = undefined;
+        },
+      })
+    );
+  }
+
+  private async levelUp(adv: Consejero): Promise<void> {
+    this.modal?.destroy();
+    this.modal = undefined;
+    const hide = loadingOverlay(this);
+    try {
+      await api.post(`/api/consejeros/${adv.id}/level`);
+      await loadUserData();
+      hide();
+      toast(this, `${adv.name.split(' ')[0]} subió de nivel`, COLORS.lime);
+      this.render();
+    } catch (err: any) {
+      hide();
+      toast(this, err.message || 'Error al mejorar', COLORS.danger);
+    }
+  }
+
+  private async battle(attackerId: string): Promise<void> {
+    const hide = loadingOverlay(this, 'BUSCANDO RIVAL...');
+    try {
+      const res = await api.post<{ battleResult: BattleResult; rewards: any }>('/api/pvp/battle', { attackerId });
+      hide();
+      this.scene.start('PvpCombat', { battleResult: res.battleResult, rewards: res.rewards });
+    } catch (err: any) {
+      hide();
+      toast(this, err.message || 'Error al combatir', COLORS.danger);
+    }
+  }
+}

@@ -1,6 +1,5 @@
-// API Client for Bannerfall with automated idempotency tokens and developer profile switching
-
-const DEV_USER_KEY = 'bannerfall_dev_user_id';
+// API Client for Tiny Tacticians with automated idempotency tokens and developer profile switching
+const DEV_USER_KEY = 'tiny_tacticians_dev_user_id';
 
 export function getDevUserId(): string {
   return localStorage.getItem(DEV_USER_KEY) || 't2_devuser';

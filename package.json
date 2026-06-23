@@ -1,5 +1,5 @@
 {
-  "name": "bannerfall",
+  "name": "tiny-tacticians",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -9,22 +9,21 @@
     "build": "vite build --config vite.config.ts && vite build --config vite.config.server.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "playtest": "devvit playtest"
+    "devvit": "node node_modules/devvit/bin/devvit.js",
+    "login": "node node_modules/devvit/bin/devvit.js login",
+    "upload": "node node_modules/devvit/bin/devvit.js upload",
+    "playtest": "node node_modules/devvit/bin/devvit.js playtest"
   },
   "dependencies": {
     "@devvit/public-api": "^0.13.4",
     "@devvit/web": "^0.13.4",
     "express": "^5.0.0-beta.3",
     "ioredis": "^5.5.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "phaser": "^4.2.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.1",
-    "@types/react": "^19.0.2",
-    "@types/react-dom": "^19.0.2",
-    "@vitejs/plugin-react": "^4.3.4",
     "devvit": "^0.13.4",
     "typescript": "^5.8.2",
     "vite": "^6.0.5",

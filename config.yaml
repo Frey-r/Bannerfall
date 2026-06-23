@@ -1,7 +1,7 @@
 schema: spec-driven-with-adr
 
 context: |
-  Project: Bannerfall — roguelike de gestión militar sobre Reddit / Devvit Web.
+  Project: Tiny Tacticians — roguelike de gestión militar sobre Reddit / Devvit Web.
   Tech stack: TypeScript, Node.js 22+, @devvit/web (server/client/shared), Redis gestionado por Devvit.
   Client: Phaser o React en webview, sin autoridad sobre el estado.
   Platform limits: request <= 30s, payload <= 4MB, response <= 10MB, serverless sin estado en proceso.

@@ -9,6 +9,7 @@ import metaRouter from './routes/meta.ts';
 import runRouter from './routes/run.ts';
 import pvpRouter from './routes/pvp.ts';
 import internalRouter from './routes/internal.ts';
+import devvitInternalRouter from './routes/devvitInternal.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,6 +34,8 @@ app.use('/api', metaRouter);
 app.use('/api/run', runRouter);
 app.use('/api/pvp', pvpRouter);
 app.use('/api/internal', internalRouter);
+// Endpoints invocados por Devvit (menú / triggers) — deben colgar de /internal/*
+app.use('/internal', devvitInternalRouter);
 
 import fs from 'fs';
 
@@ -58,7 +61,7 @@ async function startServer() {
     const port = process.env.PORT || 4000;
     app.listen(port, async () => {
       console.log(`\n======================================================`);
-      console.log(`🚀 Bannerfall Local Dev Server listening at:`);
+      console.log(`🚀 Tiny Tacticians Local Dev Server listening at:`);
       console.log(`   http://localhost:${port}`);
       console.log(`======================================================\n`);
 
@@ -78,5 +81,5 @@ async function startServer() {
 }
 
 startServer().catch(err => {
-  console.error('Fatal error starting Bannerfall server:', err);
+  console.error('Fatal error starting Tiny Tacticians server:', err);
 });
