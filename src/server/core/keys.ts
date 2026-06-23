@@ -8,4 +8,5 @@ export const keys = {
   battle: (bid: string) => `battle:${bid}`,
   idemp: (token: string) => `idemp:${token}`,
   rateLimitRun: (id: string, windowKey: string) => `rate:${id}:run:${windowKey}`,
+  firstPost: () => 'game:firstPost',
 };

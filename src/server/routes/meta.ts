@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getCurrentUserId } from '../core/auth.ts';
+import { logDevvitDiag } from '../core/diag.ts';
 import { getUserProfile, getUserConsejeros, levelConsejero } from '../core/rewards.ts';
 import { checkAndLockIdempotency, saveIdempotency } from '../core/idempotency.ts';
 
@@ -8,6 +9,7 @@ const router = Router();
 // GET /api/profile - Retrieve authenticated user profile
 router.get('/profile', async (req, res) => {
   try {
+    logDevvitDiag('api/profile', req);
     const userId = getCurrentUserId();
     const profile = await getUserProfile(userId);
     res.json(profile);

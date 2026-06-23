@@ -16,8 +16,12 @@
   },
   "permissions": {
     "reddit": {
-      "enable": true
-    }
+      "enable": true,
+      "asUser": [
+        "SUBMIT_POST"
+      ]
+    },
+    "redis": true
   },
   "menu": {
     "items": [
@@ -31,7 +35,8 @@
     ]
   },
   "triggers": {
-    "onAppInstall": "/internal/on-install"
+    "onAppInstall": "/internal/on-install",
+    "onAppUpgrade": "/internal/on-install"
   },
   "dev": {
     "subreddit": "tiny_tacticians_dev"

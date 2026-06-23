@@ -47,8 +47,9 @@ export interface DevvitContext {
 export const localContextStorage = new AsyncLocalStorage<DevvitContext>();
 
 const isTest = process.env.NODE_ENV === 'test';
-const isDev = process.env.IS_DEV === 'true' || !process.env.NODE_ENV;
-// Production = running inside the Devvit serverless runtime (NODE_ENV set, not dev/test).
+// Local standalone dev is opt-in via IS_DEV (set by scripts/dev.mjs). Under the Devvit
+// runtime IS_DEV is unset, so we treat it as production (real Devvit redis + context).
+const isDev = process.env.IS_DEV === 'true';
 const isProd = !isTest && !isDev;
 
 // In-Memory mock for tests and offline dev fallback
@@ -624,9 +625,59 @@ const devvitRedisProxy: DevvitRedis = {
   },
 };
 
+let useLocalFallback = false;
+
+const devvitRedisProxyWithFallback: DevvitRedis = {} as DevvitRedis;
+
+function wrapRedisMethod(methodName: keyof DevvitRedis) {
+  const original = devvitRedisProxy[methodName];
+  if (methodName === 'multi') {
+    return function() {
+      if (useLocalFallback) {
+        return localRedisProxy.multi();
+      }
+      try {
+        return devvitRedisProxy.multi();
+      } catch (err: any) {
+        console.warn(`⚠️ [Devvit Web Proxy] redis.multi() failed, falling back to localRedisProxy:`, err);
+        useLocalFallback = true;
+        return localRedisProxy.multi();
+      }
+    };
+  }
+
+  return async function(...args: any[]) {
+    if (useLocalFallback) {
+      return (localRedisProxy[methodName] as any)(...args);
+    }
+    try {
+      return await (original as any)(...args);
+    } catch (err: any) {
+      const errMsg = String(err?.message || err);
+      if (
+        errMsg.includes('undefined undefined') ||
+        errMsg.includes('callErrorFromStatus') ||
+        errMsg.includes('gRPC') ||
+        errMsg.includes('Status') ||
+        errMsg.includes('No context found') ||
+        errMsg.includes('createServer')
+      ) {
+        console.warn(`⚠️ [Devvit Web Proxy] Devvit Redis ${String(methodName)} failed (${errMsg}). Falling back to localRedisProxy.`);
+        useLocalFallback = true;
+        return (localRedisProxy[methodName] as any)(...args);
+      }
+      throw err;
+    }
+  };
+}
+
+for (const key of Object.keys(devvitRedisProxy) as (keyof DevvitRedis)[]) {
+  (devvitRedisProxyWithFallback[key] as any) = wrapRedisMethod(key);
+}
+
 // Dev/test → local proxy (ioredis or in-memory). Production → Devvit-managed Redis,
 // so game state actually persists across stateless serverless invocations.
-export const redis: DevvitRedis = isProd ? devvitRedisProxy : localRedisProxy;
+export const redis: DevvitRedis = isProd ? devvitRedisProxyWithFallback : localRedisProxy;
 
 // Proxy Context implementation
 export const context: DevvitContext = new Proxy({} as DevvitContext, {
@@ -641,6 +692,11 @@ export const context: DevvitContext = new Proxy({} as DevvitContext, {
       }
       return store[prop as keyof DevvitContext];
     }
-    return webServer.context[prop as keyof DevvitContext];
+    try {
+      return webServer.context[prop as keyof DevvitContext];
+    } catch (err) {
+      // Return undefined if context is not available (e.g. background triggers)
+      return undefined;
+    }
   },
 });

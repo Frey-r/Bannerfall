@@ -9,7 +9,13 @@ const procs = [
 ];
 
 const children = procs.map(({ name, cmd, args }) => {
-  const child = spawn(cmd, args, { stdio: 'inherit', shell: true });
+  // IS_DEV=true switches the server into local standalone mode (listen on :4000,
+  // in-memory/local redis, fake request context). The Devvit runtime never sets this.
+  const child = spawn(cmd, args, {
+    stdio: 'inherit',
+    shell: true,
+    env: { ...process.env, IS_DEV: 'true' },
+  });
   child.on('exit', (code) => {
     console.log(`\n[${name}] exited with code ${code}. Shutting down dev environment.`);
     for (const c of children) {

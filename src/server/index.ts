@@ -1,6 +1,8 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { once } from 'node:events';
+import type { Request, Response, NextFunction } from 'express';
 import { localContextStorage } from './devvitProxy/index.ts';
 import { seedNPCs } from './core/npc.ts';
 
@@ -16,10 +18,36 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-app.use(express.json());
+// Body parser que preserva el AsyncLocalStorage (ALS) de Devvit.
+// express.json() usa body-parser -> raw-body, que lee el stream con callbacks
+// (stream events) y llama a next() desde fuera de la cadena async. Eso rompe la
+// propagacion del ALS que createServer() establece por request, haciendo que
+// context/reddit/redis lancen "No context found" en todos los POST routes.
+// Leer el body con `await once(req, 'end')` mantiene la cadena async y el
+// contexto Devvit vivo. Sigue el patron del template oficial hello-world.
+app.use(async (req: Request, _res: Response, next: NextFunction) => {
+  if (!('body' in req)) (req as any).body = undefined;
+  const contentType = req.headers['content-type'];
+  if (typeof contentType !== 'string' || !contentType.includes('application/json')) {
+    return next();
+  }
+  try {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    await once(req, 'end');
+    const raw = Buffer.concat(chunks).toString('utf-8');
+    (req as any).body = raw ? JSON.parse(raw) : {};
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
-// Request-scoped context binding middleware (only used in local dev)
-const isDev = process.env.IS_DEV === 'true' || !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
+// Request-scoped context binding middleware (only used in local dev).
+// Local standalone dev is opt-in via IS_DEV (set by scripts/dev.mjs). Under the Devvit
+// runtime (playtest/upload) IS_DEV is unset — NODE_ENV is unset there too, so it must NOT
+// be part of this check — and we run the real server via createServer/getServerPort.
+const isDev = process.env.IS_DEV === 'true';
 
 if (isDev) {
   app.use((req, res, next) => {
@@ -76,7 +104,9 @@ async function startServer() {
     // Dynamic import inside async function is CJS compatible
     const { createServer, getServerPort } = await import('@devvit/web/server');
     const server = createServer(app);
-    server.listen(getServerPort());
+    const port = getServerPort();
+    console.log(`[Devvit Web Server] Listening on port: ${port}`);
+    server.listen(port);
   }
 }
 

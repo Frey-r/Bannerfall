@@ -15,8 +15,8 @@
     "playtest": "node node_modules/devvit/bin/devvit.js playtest"
   },
   "dependencies": {
-    "@devvit/public-api": "^0.13.4",
-    "@devvit/web": "^0.13.4",
+    "@devvit/public-api": "^0.13.5-next-2026-06-18-18-14-03-8ad26c296.0",
+    "@devvit/web": "^0.13.5-next-2026-06-18-18-14-03-8ad26c296.0",
     "express": "^5.0.0-beta.3",
     "ioredis": "^5.5.0",
     "phaser": "^4.2.0"
@@ -24,7 +24,7 @@
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.1",
-    "devvit": "^0.13.4",
+    "devvit": "^0.13.5-next-2026-06-18-18-14-03-8ad26c296.0",
     "typescript": "^5.8.2",
     "vite": "^6.0.5",
     "vitest": "^3.0.1"
