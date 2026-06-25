@@ -22,7 +22,7 @@ const config: Phaser.Types.Core.GameConfig = {
   roundPixels: true,
   scale: {
     mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
+    autoCenter: Phaser.Scale.NONE,
     width: GAME_W,
     height: GAME_H,
   },

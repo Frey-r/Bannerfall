@@ -5,7 +5,7 @@
    poder posicionarlos/animarlos como una sola unidad.
    ============================================================ */
 import Phaser from 'phaser';
-import { COLORS, FONT, hex } from './theme.ts';
+import { COLORS, FONT, hex, PAD, TOUCH_H, TEXT_RES } from './theme.ts';
 import { avatarKeyFor } from '../assets.ts';
 
 type Scene = Phaser.Scene;
@@ -101,6 +101,7 @@ export function titleText(
       fontSize: `${size}px`,
       color: hex(color),
     })
+    .setResolution(TEXT_RES)
     .setOrigin(0.5)
     .setShadow(2, 2, 'rgba(0,0,0,0.6)', 0, true, true);
 }
@@ -120,6 +121,7 @@ export function bodyText(
       color: hex(color),
       fontStyle: 'bold',
     })
+    .setResolution(TEXT_RES)
     .setOrigin(0.5);
 }
 
@@ -145,8 +147,9 @@ export function retroButton(
   const measure = scene.add
     .text(0, 0, label, { fontFamily: FONT.title, fontSize: `${fontSize}px` })
     .setVisible(false);
-  const w = opts.width ?? Math.max(120, Math.ceil(measure.width) + padX * 2);
-  const h = opts.height ?? Math.max(48, fontSize * 2 + 22);
+  const w = opts.width ?? Math.max(140, Math.ceil(measure.width) + padX * 2);
+  // Altura mínima táctil para móvil (los botones se tocan con el dedo).
+  const h = opts.height ?? Math.max(TOUCH_H, fontSize * 2 + 26);
   measure.destroy();
 
   const enabled = opts.enabled !== false;
@@ -169,13 +172,16 @@ export function retroButton(
   const body = scene.add.rectangle(0, 0, w, h, fill).setStrokeStyle(3, COLORS.border);
   const topEdge = scene.add.rectangle(0, -h / 2 + 3, w - 6, 4, topColor);
   const bottomEdge = scene.add.rectangle(0, h / 2 - 4, w - 6, 5, edgeColor);
+  const isLightText = !enabled || opts.variant === 'maroon';
+  const shadowColor = isLightText ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.25)';
+  const shadowOffset = isLightText ? 2 : 1;
   const text = titleText(scene, 0, 0, label, fontSize, enabled ? textColor : 0x46423a).setShadow(
-    1,
-    1,
-    'rgba(255,255,255,0.2)',
+    shadowOffset,
+    shadowOffset,
+    shadowColor,
     0,
     true,
-    false
+    isLightText
   );
 
   const press = scene.add.container(0, 0, [body, topEdge, bottomEdge, text]);
@@ -237,13 +243,14 @@ export function screenTopbar(
 ): Phaser.GameObjects.Container {
   const w = scene.scale.width;
   const container = scene.add.container(0, 0);
-  const back = retroButton(scene, 90, 40, '< VOLVER', {
+  const back = retroButton(scene, PAD + 78, 52, '< VOLVER', {
     variant: 'grey',
-    fontSize: 12,
-    height: 44,
+    fontSize: 13,
+    width: 156,
+    height: 56,
     onClick: onBack,
   });
-  const titleTxt = titleText(scene, w / 2, 40, title.toUpperCase(), 18, COLORS.cream);
+  const titleTxt = titleText(scene, w / 2, 52, title.toUpperCase(), 17, COLORS.cream);
   container.add([back, titleTxt]);
   return container;
 }

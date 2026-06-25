@@ -3,7 +3,7 @@
    (POST /api/pvp/battle) y leaderboard de temporada.
    ============================================================ */
 import Phaser from 'phaser';
-import { COLORS, GAME_W, GAME_H } from '../ui/theme.ts';
+import { COLORS, GAME_W, PAD, CONTENT_W } from '../ui/theme.ts';
 import {
   screenTopbar,
   retroButton,
@@ -71,13 +71,16 @@ export class PvpScene extends Phaser.Scene {
     this.dyn = c;
 
     if (store.generals.length === 0) {
-      c.add(retroPanel(this, GAME_W / 2, GAME_H / 2, 720, 320, COLORS.card));
-      c.add(titleText(this, GAME_W / 2, GAME_H / 2 - 60, 'Sin generales todavía', 18, COLORS.ink));
-      c.add(bodyText(this, GAME_W / 2, GAME_H / 2, 'Necesitas un comandante entrenado para entrar al PvP.', 14, COLORS.ink));
+      const cy = 600;
+      c.add(retroPanel(this, GAME_W / 2, cy, CONTENT_W, 360, COLORS.card));
+      c.add(titleText(this, GAME_W / 2, cy - 140, 'Sin generales\ntodavía', 18, COLORS.ink).setAlign('center'));
       c.add(
-        retroButton(this, GAME_W / 2, GAME_H / 2 + 80, ')==> CORRER RUN', {
-          width: 360,
-          height: 64,
+        bodyText(this, GAME_W / 2, cy - 10, 'Necesitas un comandante entrenado\npara entrar al PvP.', 14, COLORS.ink).setAlign('center')
+      );
+      c.add(
+        retroButton(this, GAME_W / 2, cy + 110, ')==> CORRER RUN', {
+          width: CONTENT_W - 80,
+          height: 76,
           fontSize: 16,
           onClick: () => this.scene.start('RunSetup'),
         })
@@ -95,41 +98,43 @@ export class PvpScene extends Phaser.Scene {
     if (i < 0) i = 0;
     const g = gens[i];
 
-    const cx = 360;
-    c.add(retroPanel(this, cx, 280, 600, 300, COLORS.card));
-    c.add(titleText(this, cx, 160, 'Tu General', 16, COLORS.ink));
-    c.add(portrait(this, cx - 200, 280, g.id, 110, affinityColor('OFE')));
-    c.add(bodyText(this, cx - 110, 230, g.name, 18, COLORS.ink).setOrigin(0, 0.5));
-    c.add(bodyText(this, cx - 110, 270, `Tier ${tierLetter(g.tier)}  ·  Poder ${g.power}`, 14, COLORS.ink).setOrigin(0, 0.5));
+    const cx = GAME_W / 2;
+    c.add(titleText(this, cx, 150, 'Tu General', 16, COLORS.cream));
+    c.add(retroPanel(this, cx, 300, CONTENT_W, 240, COLORS.card));
+    c.add(portrait(this, cx - 190, 300, g.id, 128, affinityColor('OFE')));
+    c.add(bodyText(this, cx - 95, 248, g.name, 18, COLORS.ink).setOrigin(0, 0.5));
+    c.add(bodyText(this, cx - 95, 290, `Tier ${tierLetter(g.tier)}  ·  Poder ${g.power}`, 14, COLORS.ink).setOrigin(0, 0.5));
     c.add(
-      bodyText(this, cx - 110, 310, `OFE ${g.stats.ofe} / DEF ${g.stats.def} / MAN ${g.stats.man}`, 13, COLORS.ink).setOrigin(0, 0.5)
+      bodyText(this, cx - 95, 330, `OFE ${g.stats.ofe} / DEF ${g.stats.def} / MAN ${g.stats.man}`, 13, COLORS.ink).setOrigin(0, 0.5)
     );
 
     // Cambiar general (ciclar)
     if (gens.length > 1) {
       c.add(
-        retroButton(this, cx - 180, 410, '◀', {
+        retroButton(this, cx - 120, 470, '◀', {
           variant: 'grey',
-          width: 70,
+          width: 80,
+          height: 60,
           fontSize: 16,
           onClick: () => this.cycle(-1),
         })
       );
+      c.add(bodyText(this, cx, 470, `${i + 1} / ${gens.length}`, 14, COLORS.cream));
       c.add(
-        retroButton(this, cx - 80, 410, '▶', {
+        retroButton(this, cx + 120, 470, '▶', {
           variant: 'grey',
-          width: 70,
+          width: 80,
+          height: 60,
           fontSize: 16,
           onClick: () => this.cycle(1),
         })
       );
-      c.add(bodyText(this, cx + 60, 410, `${i + 1}/${gens.length}`, 13, COLORS.ink).setOrigin(0, 0.5));
     }
 
     c.add(
-      retroButton(this, cx, 540, '(D) BUSCAR RIVAL', {
-        width: 420,
-        height: 72,
+      retroButton(this, cx, 560, '(D) BUSCAR RIVAL', {
+        width: CONTENT_W,
+        height: 80,
         fontSize: 18,
         onClick: () => this.startBattle(g.id),
       })
@@ -137,37 +142,39 @@ export class PvpScene extends Phaser.Scene {
   }
 
   private renderLeaderboard(c: Phaser.GameObjects.Container): void {
-    const lx = GAME_W - 320;
-    c.add(retroPanel(this, lx, 400, 560, 520, COLORS.card));
-    c.add(titleText(this, lx, 160, '🏆 Leaderboard S1', 14, COLORS.ink));
+    const cx = GAME_W / 2;
+    c.add(titleText(this, cx, 666, '🏆 Leaderboard S1', 14, COLORS.cream));
+    c.add(retroPanel(this, cx, 930, CONTENT_W, 500, COLORS.card));
 
     if (this.lb.length === 0) {
-      c.add(bodyText(this, lx, 380, 'Sin clasificación todavía.', 13, COLORS.ink));
+      c.add(bodyText(this, cx, 900, 'Sin clasificación todavía.', 13, COLORS.ink));
     } else {
       this.lb.forEach((row, idx) => {
         const rank = (this.lbPage - 1) * 8 + idx + 1;
         const mine = row.userId === (store.profile?.userId ?? '');
-        const ry = 210 + idx * 48;
-        c.add(bodyText(this, lx - 250, ry, `#${rank}  ${row.name.substring(0, 18)}`, 13, mine ? 0x2e6b2e : COLORS.ink).setOrigin(0, 0.5));
-        c.add(bodyText(this, lx + 240, ry, `${row.score}`, 13, COLORS.ink).setOrigin(1, 0.5));
+        const ry = 730 + idx * 50;
+        c.add(bodyText(this, PAD + 40, ry, `#${rank}  ${row.name.substring(0, 18)}`, 13, mine ? 0x2e6b2e : COLORS.ink).setOrigin(0, 0.5));
+        c.add(bodyText(this, GAME_W - PAD - 40, ry, `${row.score}`, 13, COLORS.ink).setOrigin(1, 0.5));
       });
     }
 
     // Paginación
     c.add(
-      retroButton(this, lx - 80, 620, '◀', {
+      retroButton(this, cx - 120, 1150, '◀', {
         variant: 'grey',
-        width: 64,
+        width: 80,
+        height: 56,
         fontSize: 14,
         enabled: this.lbPage > 1,
         onClick: () => this.changePage(this.lbPage - 1),
       })
     );
-    c.add(bodyText(this, lx, 620, `Pág ${this.lbPage}`, 13, COLORS.ink));
+    c.add(bodyText(this, cx, 1150, `Pág ${this.lbPage}`, 13, COLORS.cream));
     c.add(
-      retroButton(this, lx + 80, 620, '▶', {
+      retroButton(this, cx + 120, 1150, '▶', {
         variant: 'grey',
-        width: 64,
+        width: 80,
+        height: 56,
         fontSize: 14,
         enabled: this.lb.length >= 8,
         onClick: () => this.changePage(this.lbPage + 1),

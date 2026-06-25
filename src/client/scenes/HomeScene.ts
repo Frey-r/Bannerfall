@@ -4,7 +4,7 @@
    campo pixel-art animado y navegación inferior (JUGAR / etc).
    ============================================================ */
 import Phaser from 'phaser';
-import { COLORS, hex, GAME_W, GAME_H } from '../ui/theme.ts';
+import { COLORS, hex, GAME_W, GAME_H, PAD, CONTENT_W } from '../ui/theme.ts';
 import { retroButton, headerBar, resourcePill, titleText, retroPanel } from '../ui/widgets.ts';
 import { store, loadUserData } from '../state.ts';
 import { getDevUserId } from '../api.ts';
@@ -22,7 +22,7 @@ export class HomeScene extends Phaser.Scene {
     this.buildField();
     this.buildNav();
     this.buildStatusBar();
-    headerBar(this, GAME_W / 2, 92, GAME_W - 120, 'Campo de Entrenamiento', 16);
+    headerBar(this, GAME_W / 2, 168, CONTENT_W, 'Campo de Entrenamiento', 15);
     this.refresh();
   }
 
@@ -41,29 +41,29 @@ export class HomeScene extends Phaser.Scene {
     const gold = store.profile ? store.profile.gold : 120;
     const advisors = store.advisors.length;
 
-    bar.add(resourcePill(this, 60, 40, 'icon_gold', `${gold} oro`, COLORS.lime));
-    bar.add(resourcePill(this, 280, 40, 'icon_shield', `${advisors} consejeros`, COLORS.card));
+    bar.add(resourcePill(this, PAD, 52, 'icon_gold', `${gold} oro`, COLORS.lime));
+    bar.add(resourcePill(this, PAD, 104, 'icon_shield', `${advisors} consejeros`, COLORS.card));
 
     bar.add(
       this.add
-        .text(GAME_W - 130, 40, getDevUserId(), {
+        .text(GAME_W - PAD, 110, getDevUserId(), {
           fontFamily: '"JetBrains Mono", monospace',
-          fontSize: '13px',
+          fontSize: '12px',
           color: hex(0x6b6258),
         })
         .setOrigin(1, 0.5)
     );
     bar.add(
-      retroButton(this, GAME_W - 70, 40, '⚙', { variant: 'grey', fontSize: 16, width: 56, height: 44 })
+      retroButton(this, GAME_W - PAD - 30, 56, '⚙', { variant: 'grey', fontSize: 18, width: 60, height: 56 })
     );
     this.statusBar = bar;
   }
 
   private buildField(): void {
-    const fx = 60;
-    const fy = 130;
-    const fw = GAME_W - 120;
-    const fh = 460;
+    const fx = PAD;
+    const fy = 206;
+    const fw = CONTENT_W;
+    const fh = 720;
     const cx = fx + fw / 2;
     const groundY = fy + fh - 30;
 
@@ -91,8 +91,8 @@ export class HomeScene extends Phaser.Scene {
     this.placeBuilding(field, 'barracks', fx + fw - 120, groundY, 140);
 
     // Montones de oro
-    field.add(this.add.image(fx + 320, groundY - 6, 'goldResource').setOrigin(0.5, 1).setScale(0.8));
-    field.add(this.add.image(fx + fw - 300, groundY - 6, 'goldResource').setOrigin(0.5, 1).setScale(0.8));
+    field.add(this.add.image(fx + 170, groundY - 6, 'goldResource').setOrigin(0.5, 1).setScale(0.8));
+    field.add(this.add.image(fx + fw - 170, groundY - 6, 'goldResource').setOrigin(0.5, 1).setScale(0.8));
 
     // Caballeros sparring (sprites animados reales)
     const blue = this.add.sprite(cx - 150, groundY, 'warriorBlue').setOrigin(0.5, 1).setScale(0.62).play('warriorBlue_idle');
@@ -140,25 +140,26 @@ export class HomeScene extends Phaser.Scene {
   }
 
   private buildNav(): void {
-    const y = GAME_H - 70;
-    retroButton(this, 220, y, 'COLECCIÓN', {
-      variant: 'grey',
-      width: 280,
-      height: 84,
-      fontSize: 16,
-      onClick: () => this.scene.start('Collection'),
-    });
-    retroButton(this, GAME_W / 2, y, '>> JUGAR', {
-      width: 300,
-      height: 92,
-      fontSize: 24,
+    const cx = GAME_W / 2;
+    // Navegación apilada full-width (objetivos táctiles grandes).
+    retroButton(this, cx, 1012, '>> JUGAR', {
+      width: CONTENT_W,
+      height: 104,
+      fontSize: 28,
       onClick: () => this.toggleJugarModal(true),
     });
-    retroButton(this, GAME_W - 220, y, 'EVENTOS', {
+    retroButton(this, cx, 1122, 'COLECCIÓN', {
       variant: 'grey',
-      width: 280,
-      height: 84,
-      fontSize: 16,
+      width: CONTENT_W,
+      height: 80,
+      fontSize: 18,
+      onClick: () => this.scene.start('Collection'),
+    });
+    retroButton(this, cx, 1210, 'EVENTOS', {
+      variant: 'grey',
+      width: CONTENT_W,
+      height: 80,
+      fontSize: 18,
       onClick: () => this.scene.start('Eventos'),
     });
   }
@@ -176,30 +177,35 @@ export class HomeScene extends Phaser.Scene {
       .rectangle(0, 0, GAME_W, GAME_H, 0x0a0806, 0.72)
       .setOrigin(0, 0)
       .setInteractive();
-    const panel = retroPanel(this, GAME_W / 2, GAME_H / 2, 540, 360, COLORS.panelDark);
-    const title = titleText(this, GAME_W / 2, GAME_H / 2 - 130, '¿Qué quieres hacer?', 18, COLORS.cream);
-    const run = retroButton(this, GAME_W / 2, GAME_H / 2 - 40, ')==> CORRER RUN', {
+    const cx = GAME_W / 2;
+    const cy = GAME_H / 2;
+    const panel = retroPanel(this, cx, cy, 620, 440, COLORS.panelDark);
+    const title = titleText(this, cx, cy - 160, '¿Qué quieres hacer?', 18, COLORS.cream);
+    const run = retroButton(this, cx, cy - 60, ')==> CORRER RUN', {
       variant: 'grey',
-      width: 420,
+      width: 540,
+      height: 76,
       fontSize: 16,
       onClick: () => {
         this.toggleJugarModal(false);
         this.scene.start('RunSetup');
       },
     });
-    const pvp = retroButton(this, GAME_W / 2, GAME_H / 2 + 40, '(D) PVP / ARENA', {
+    const pvp = retroButton(this, cx, cy + 40, '(D) PVP / ARENA', {
       variant: 'grey',
-      width: 420,
+      width: 540,
+      height: 76,
       fontSize: 16,
       onClick: () => {
         this.toggleJugarModal(false);
         this.scene.start('Pvp');
       },
     });
-    const close = retroButton(this, GAME_W / 2, GAME_H / 2 + 130, '[ x cerrar ]', {
+    const close = retroButton(this, cx, cy + 150, '[ x cerrar ]', {
       variant: 'maroon',
-      width: 220,
-      fontSize: 12,
+      width: 320,
+      height: 60,
+      fontSize: 13,
       onClick: () => this.toggleJugarModal(false),
     });
     modal.add([backdrop, panel, title, run, pvp, close]);

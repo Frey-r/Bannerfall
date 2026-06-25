@@ -17,14 +17,21 @@
         overflow: hidden;
         background-color: #15110e;
       }
+      /* Fondo temático para el letterbox: en escritorio el lienzo portrait
+         se centra y los lados muestran este degradado oscuro de la paleta. */
       #game {
         width: 100vw;
         height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
+        background:
+          radial-gradient(circle at 50% 40%, #1f1812 0%, #15110e 60%, #0d0a08 100%);
       }
-      #game canvas { image-rendering: pixelated; }
+      /* 'auto' (no 'pixelated'): el lienzo se escala suave por CSS para que
+         las fuentes web no salgan en bloques. Los sprites mantienen su look
+         pixel-art por el filtrado NEAREST de WebGL (pixelArt:true en Phaser). */
+      #game canvas { image-rendering: auto; }
     </style>
   </head>
   <body>

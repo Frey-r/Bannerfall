@@ -4,7 +4,7 @@
    enviar generales a la arena.
    ============================================================ */
 import Phaser from 'phaser';
-import { COLORS, GAME_W, GAME_H } from '../ui/theme.ts';
+import { COLORS, GAME_W, GAME_H, PAD, CONTENT_W } from '../ui/theme.ts';
 import {
   screenTopbar,
   retroButton,
@@ -51,9 +51,10 @@ export class CollectionScene extends Phaser.Scene {
     this.dyn = c;
 
     c.add(
-      retroButton(this, GAME_W / 2 - 160, 110, '[ CONSEJEROS ]', {
+      retroButton(this, GAME_W / 2 - 162, 128, '[ CONSEJEROS ]', {
         variant: this.tab === 'consejeros' ? 'lime' : 'grey',
-        width: 300,
+        width: 308,
+        height: 64,
         fontSize: 13,
         onClick: () => {
           this.tab = 'consejeros';
@@ -62,9 +63,10 @@ export class CollectionScene extends Phaser.Scene {
       })
     );
     c.add(
-      retroButton(this, GAME_W / 2 + 160, 110, '[ GENERALES ]', {
+      retroButton(this, GAME_W / 2 + 162, 128, '[ GENERALES ]', {
         variant: this.tab === 'generales' ? 'lime' : 'grey',
-        width: 300,
+        width: 308,
+        height: 64,
         fontSize: 13,
         onClick: () => {
           this.tab = 'generales';
@@ -78,52 +80,55 @@ export class CollectionScene extends Phaser.Scene {
   }
 
   private renderAdvisors(c: Phaser.GameObjects.Container): void {
-    c.add(bodyText(this, GAME_W / 2, 170, `Consejeros ${store.advisors.length} / 12`, 15, COLORS.cream));
-    const cols = 4;
-    const x0 = GAME_W / 2 - ((cols - 1) * 200) / 2;
+    const cx0 = GAME_W / 2;
+    c.add(bodyText(this, cx0, 195, `Consejeros ${store.advisors.length} / 12`, 15, COLORS.cream));
+    const cols = 3;
+    const W = 188;
+    const H = 150;
     store.advisors.slice(0, 12).forEach((adv, i) => {
-      const cx = x0 + (i % cols) * 200;
-      const cy = 270 + Math.floor(i / cols) * 165;
-      const card = this.add.container(cx, cy);
-      card.add(this.add.rectangle(0, 0, 160, 145, COLORS.card2).setStrokeStyle(3, COLORS.border));
-      card.add(portrait(this, 0, -18, adv.id, 68, affinityColor(adv.affinity)));
+      const ax = cx0 + ((i % cols) - 1) * 200;
+      const ay = 290 + Math.floor(i / cols) * 168;
+      const card = this.add.container(ax, ay);
+      card.add(this.add.rectangle(0, 0, W, H, COLORS.card2).setStrokeStyle(3, COLORS.border));
+      card.add(portrait(this, 0, -20, adv.id, 70, affinityColor(adv.affinity)));
       card.add(bodyText(this, 0, 38, adv.name.split(' ')[0], 13, COLORS.ink));
       card.add(bodyText(this, 0, 58, `${adv.affinity} · Lv${adv.level}`, 12, COLORS.ink));
-      card.setSize(160, 145).setInteractive(new Phaser.Geom.Rectangle(-80, -72, 160, 145), Phaser.Geom.Rectangle.Contains);
+      card.setSize(W, H).setInteractive(new Phaser.Geom.Rectangle(-W / 2, -H / 2, W, H), Phaser.Geom.Rectangle.Contains);
       if (card.input) card.input.cursor = 'pointer';
       card.on('pointerdown', () => this.openUpgrade(adv));
       c.add(card);
     });
-    c.add(bodyText(this, GAME_W / 2, GAME_H - 50, 'Toca un consejero para subir su nivel (gasta oro).', 12, COLORS.cream));
+    c.add(bodyText(this, cx0, GAME_H - 44, 'Toca un consejero para subir su nivel (gasta oro).', 12, COLORS.cream));
   }
 
   private renderGenerals(c: Phaser.GameObjects.Container): void {
-    c.add(bodyText(this, GAME_W / 2, 170, `Generales acuñados (${store.generals.length})`, 15, COLORS.cream));
+    const cx = GAME_W / 2;
+    c.add(bodyText(this, cx, 195, `Generales acuñados (${store.generals.length})`, 15, COLORS.cream));
     if (store.generals.length === 0) {
-      c.add(bodyText(this, GAME_W / 2, 360, 'Sin generales. ¡Corre una run para reclutar!', 14, COLORS.cream));
+      c.add(bodyText(this, cx, 400, 'Sin generales.\n¡Corre una run para reclutar!', 14, COLORS.cream).setAlign('center'));
       return;
     }
     store.generals.slice(0, 6).forEach((g, i) => {
-      const ry = 250 + i * 80;
-      c.add(retroPanel(this, GAME_W / 2, ry, 900, 70, COLORS.card));
-      c.add(portrait(this, GAME_W / 2 - 410, ry, g.id, 56, affinityColor('OFE')));
-      c.add(bodyText(this, GAME_W / 2 - 360, ry - 12, g.name, 15, COLORS.ink).setOrigin(0, 0.5));
+      const ry = 300 + i * 158;
+      c.add(retroPanel(this, cx, ry, CONTENT_W, 142, COLORS.card));
+      c.add(portrait(this, PAD + 52, ry - 26, g.id, 64, affinityColor('OFE')));
+      c.add(bodyText(this, PAD + 100, ry - 44, g.name, 15, COLORS.ink).setOrigin(0, 0.5));
       c.add(
-        bodyText(this, GAME_W / 2 - 360, ry + 14, `Tier ${tierLetter(g.tier)} · Poder ${g.power} · ${g.stats.ofe}/${g.stats.def}/${g.stats.man}`, 12, COLORS.ink).setOrigin(0, 0.5)
+        bodyText(this, PAD + 100, ry - 16, `Tier ${tierLetter(g.tier)} · Poder ${g.power} · ${g.stats.ofe}/${g.stats.def}/${g.stats.man}`, 11, COLORS.ink).setOrigin(0, 0.5)
       );
       c.add(
-        retroButton(this, GAME_W / 2 + 230, ry, '⚔ COMBATIR', {
-          width: 200,
-          height: 52,
+        retroButton(this, cx - 118, ry + 36, '⚔ COMBATIR', {
+          width: 280,
+          height: 54,
           fontSize: 12,
           onClick: () => this.battle(g.id),
         })
       );
       c.add(
-        retroButton(this, GAME_W / 2 + 400, ry, 'ARENA', {
+        retroButton(this, cx + 170, ry + 36, 'ARENA', {
           variant: 'grey',
-          width: 130,
-          height: 52,
+          width: 200,
+          height: 54,
           fontSize: 12,
           onClick: () => this.scene.start('Pvp', { selectedGeneralId: g.id }),
         })

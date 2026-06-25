@@ -52,6 +52,25 @@ export const FONT = {
   body: '"JetBrains Mono", "VT323", "Courier New", monospace',
 } as const;
 
-/** Tamaño base del lienzo (landscape, proporción del mockup). */
-export const GAME_W = 1280;
-export const GAME_H = 800;
+/** Tamaño base del lienzo (PORTRAIT / móvil, proporción 9:16).
+ *  Scale.FIT escala este lienzo a cualquier pantalla; en escritorio se
+ *  muestra como columna vertical centrada y el sobrante queda como
+ *  letterbox (vestido por CSS en index.html). */
+export const GAME_W = 720;
+export const GAME_H = 1280;
+
+/** Margen lateral de la columna de contenido. */
+export const PAD = 36;
+/** Ancho útil de la columna (botones/paneles full-width). */
+export const CONTENT_W = GAME_W - PAD * 2;
+/** Altura mínima táctil para botones (px en el espacio de diseño). */
+export const TOUCH_H = 72;
+
+/** Multiplicador de resolución para los textos (glifos nítidos).
+ *  FIT reescala el lienzo por CSS, así que renderizamos el texto más
+ *  denso según el devicePixelRatio para que no salga borroso/dentado.
+ *  Acotado para no disparar el uso de memoria de texturas. */
+export const TEXT_RES = Math.min(
+  4,
+  Math.max(2, Math.round((typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) * 1.5))
+);

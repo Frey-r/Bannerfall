@@ -3,7 +3,7 @@
    POST /api/run/start con el deckSnapshot -> RunPlay.
    ============================================================ */
 import Phaser from 'phaser';
-import { COLORS, GAME_W, GAME_H } from '../ui/theme.ts';
+import { COLORS, GAME_W, CONTENT_W } from '../ui/theme.ts';
 import {
   screenTopbar,
   retroButton,
@@ -51,26 +51,27 @@ export class RunSetupScene extends Phaser.Scene {
     const c = this.add.container(0, 0);
     this.content = c;
 
-    c.add(titleText(this, GAME_W / 2, 110, `1. Elige 3 consejeros  ${this.selected.length}/3`, 16, COLORS.cream));
+    c.add(titleText(this, GAME_W / 2, 120, `1. Elige 3 consejeros  ${this.selected.length}/3`, 15, COLORS.cream));
 
+    // Rejilla 3 columnas (12 consejeros -> 4 filas) para caber en vertical.
     const advisors = store.advisors.slice(0, 12);
-    const cols = 4;
-    const x0 = GAME_W / 2 - ((cols - 1) * 200) / 2;
+    const cols = 3;
     advisors.forEach((adv, i) => {
-      const cx = x0 + (i % cols) * 200;
-      const cy = 210 + Math.floor(i / cols) * 170;
+      const cx = GAME_W / 2 + ((i % cols) - 1) * 200;
+      const cy = 215 + Math.floor(i / cols) * 162;
       c.add(this.advisorCard(adv, cx, cy));
     });
 
     // Nombre del general
-    c.add(titleText(this, GAME_W / 2, GAME_H - 200, '2. Nombra a tu general', 16, COLORS.cream));
-    c.add(retroPanel(this, GAME_W / 2 - 80, GAME_H - 150, 320, 56, COLORS.card));
-    c.add(bodyText(this, GAME_W / 2 - 80, GAME_H - 150, this.generalName, 22, COLORS.ink));
+    c.add(titleText(this, GAME_W / 2, 858, '2. Nombra a tu general', 15, COLORS.cream));
+    c.add(retroPanel(this, GAME_W / 2, 912, 460, 60, COLORS.card));
+    c.add(bodyText(this, GAME_W / 2, 912, this.generalName, 20, COLORS.ink));
     c.add(
-      retroButton(this, GAME_W / 2 + 160, GAME_H - 150, '🎲 OTRO', {
+      retroButton(this, GAME_W / 2, 992, '🎲 OTRO NOMBRE', {
         variant: 'grey',
         fontSize: 13,
-        width: 150,
+        width: 300,
+        height: 60,
         onClick: () => {
           this.generalName = randomGeneralName();
           this.rebuild();
@@ -81,10 +82,10 @@ export class RunSetupScene extends Phaser.Scene {
     // Comenzar
     const ready = this.selected.length === 3;
     c.add(
-      retroButton(this, GAME_W / 2, GAME_H - 70, '>> COMENZAR RUN', {
-        width: 420,
-        height: 70,
-        fontSize: 18,
+      retroButton(this, GAME_W / 2, 1206, '>> COMENZAR RUN', {
+        width: CONTENT_W,
+        height: 84,
+        fontSize: 20,
         enabled: ready,
         onClick: () => this.startRun(),
       })
@@ -92,16 +93,18 @@ export class RunSetupScene extends Phaser.Scene {
   }
 
   private advisorCard(adv: Consejero, x: number, y: number): Phaser.GameObjects.Container {
+    const W = 188;
+    const H = 150;
     const card = this.add.container(x, y);
     const isSel = this.selected.includes(adv.id);
     const box = this.add
-      .rectangle(0, 0, 160, 150, isSel ? 0xdfe9b6 : COLORS.card2)
+      .rectangle(0, 0, W, H, isSel ? 0xdfe9b6 : COLORS.card2)
       .setStrokeStyle(3, isSel ? COLORS.limeEdge : COLORS.border);
     card.add(box);
-    card.add(portrait(this, 0, -22, adv.id, 70, affinityColor(adv.affinity)));
-    card.add(bodyText(this, 0, 36, `${adv.name.split(' ')[0]}`, 14, COLORS.ink));
-    card.add(bodyText(this, 0, 56, `${adv.affinity} · Lv${adv.level}`, 12, COLORS.ink));
-    card.setSize(160, 150).setInteractive(new Phaser.Geom.Rectangle(-80, -75, 160, 150), Phaser.Geom.Rectangle.Contains);
+    card.add(portrait(this, 0, -22, adv.id, 72, affinityColor(adv.affinity)));
+    card.add(bodyText(this, 0, 38, `${adv.name.split(' ')[0]}`, 14, COLORS.ink));
+    card.add(bodyText(this, 0, 58, `${adv.affinity} · Lv${adv.level}`, 12, COLORS.ink));
+    card.setSize(W, H).setInteractive(new Phaser.Geom.Rectangle(-W / 2, -H / 2, W, H), Phaser.Geom.Rectangle.Contains);
     if (card.input) card.input.cursor = 'pointer';
     card.on('pointerdown', () => this.toggle(adv.id));
     return card;

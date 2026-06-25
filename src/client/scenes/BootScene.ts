@@ -4,7 +4,7 @@
    las alimenta al loader de Phaser y arranca HomeScene.
    ============================================================ */
 import Phaser from 'phaser';
-import { COLORS, hex, GAME_W, GAME_H } from '../ui/theme.ts';
+import { COLORS, hex, GAME_W, GAME_H, CONTENT_W, TEXT_RES } from '../ui/theme.ts';
 import { ICON, SPRITE, AVATARS, PANEL } from '../assets.ts';
 import splashUrl from '../assets/bannerfall_splash.png';
 
@@ -75,19 +75,23 @@ export class BootScene extends Phaser.Scene {
     const cy = GAME_H / 2;
 
     this.add
-      .text(cx, cy - 60, 'TINY TACTICIANS', {
+      .text(cx, cy - 70, 'TINY\nTACTICIANS', {
         fontFamily: '"Press Start 2P", monospace',
-        fontSize: '28px',
+        fontSize: '30px',
         color: hex(COLORS.lime),
+        align: 'center',
+        lineSpacing: 14,
       })
+      .setResolution(TEXT_RES)
       .setOrigin(0.5);
 
-    const barW = 420;
-    const barH = 26;
-    this.add.rectangle(cx, cy, barW + 8, barH + 8, COLORS.panelDark).setStrokeStyle(3, COLORS.border);
-    const fill = this.add.rectangle(cx - barW / 2, cy, 1, barH, COLORS.lime).setOrigin(0, 0.5);
+    const barW = CONTENT_W;
+    const barH = 28;
+    this.add.rectangle(cx, cy + 40, barW + 8, barH + 8, COLORS.panelDark).setStrokeStyle(3, COLORS.border);
+    const fill = this.add.rectangle(cx - barW / 2, cy + 40, 1, barH, COLORS.lime).setOrigin(0, 0.5);
     const pct = this.add
-      .text(cx, cy + 44, '0%', { fontFamily: '"Press Start 2P", monospace', fontSize: '14px', color: hex(COLORS.cream) })
+      .text(cx, cy + 90, '0%', { fontFamily: '"Press Start 2P", monospace', fontSize: '16px', color: hex(COLORS.cream) })
+      .setResolution(TEXT_RES)
       .setOrigin(0.5);
 
     this.load.on('progress', (value: number) => {
