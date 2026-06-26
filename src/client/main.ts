@@ -22,7 +22,10 @@ const config: Phaser.Types.Core.GameConfig = {
   roundPixels: true,
   scale: {
     mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.NONE,
+    // Phaser DEBE centrar el lienzo él mismo: si lo centra el CSS (flexbox) con
+    // autoCenter NONE, el ScaleManager cree que el canvas está en (0,0) y los
+    // clics quedan desfasados hacia arriba-izquierda en el letterbox.
+    autoCenter: Phaser.Scale.CENTER_BOTH,
     width: GAME_W,
     height: GAME_H,
   },
