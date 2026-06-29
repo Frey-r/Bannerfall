@@ -5,7 +5,8 @@
    ============================================================ */
 import Phaser from 'phaser';
 import { COLORS, hex, GAME_W, GAME_H, PAD, CONTENT_W } from '../ui/theme.ts';
-import { retroButton, headerBar, resourcePill, titleText, retroPanel } from '../ui/widgets.ts';
+import { retroButton, resourcePill, titleText, retroPanel } from '../ui/widgets.ts';
+import { TERRAIN } from '../assets.ts';
 import { store, loadUserData } from '../state.ts';
 import { getDevUserId } from '../api.ts';
 
@@ -19,10 +20,9 @@ export class HomeScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(COLORS.screen);
-    this.buildField();
+    this.buildBackground();
     this.buildNav();
     this.buildStatusBar();
-    headerBar(this, GAME_W / 2, 168, CONTENT_W, 'Campo de Entrenamiento', 15);
     this.refresh();
   }
 
@@ -59,71 +59,90 @@ export class HomeScene extends Phaser.Scene {
     this.statusBar = bar;
   }
 
-  private buildField(): void {
-    const fx = PAD;
-    const fy = 206;
-    const fw = CONTENT_W;
-    const fh = 720;
-    const cx = fx + fw / 2;
-    const groundY = fy + fh - 30;
+  /** Fondo a pantalla completa: cielo, césped tileado (tileset del pack),
+   *  skyline del pueblo y caballeros entrenando. Los botones se dibujan
+   *  encima (ver buildNav). */
+  private buildBackground(): void {
+    const cx = GAME_W / 2;
+    const grassTop = 600; // horizonte: arriba el cielo, abajo el césped
+    const groundY = 724; // línea donde se asientan los edificios
 
-    const field = this.add.container(0, 0);
+    // Cielo: degradado de atardecer (azul arriba -> cálido en el horizonte).
+    const sky = this.add.graphics();
+    sky.fillGradientStyle(0x24344f, 0x24344f, 0x8a6f6a, 0x8a6f6a, 1);
+    sky.fillRect(0, 0, GAME_W, grassTop + 48);
 
-    // Césped + cielo + franjas
-    field.add(this.add.rectangle(fx, fy, fw, fh, COLORS.grass).setOrigin(0, 0));
-    field.add(this.add.rectangle(fx, fy, fw, fh * 0.34, 0x3a4a63).setOrigin(0, 0).setAlpha(0.85));
-    for (let y = fy + 6; y < fy + fh; y += 26) {
-      field.add(this.add.rectangle(fx, y, fw, 2, COLORS.grassRow, 0.35).setOrigin(0, 0));
+    // Césped tileado a pantalla completa: tile central del tileset, repite sin
+    // costuras de extremo a extremo del lienzo.
+    this.add
+      .tileSprite(cx, grassTop, GAME_W, GAME_H - grassTop, TERRAIN.tilesetKey, TERRAIN.grassCenterFrame)
+      .setOrigin(0.5, 0);
+    // Franja de tierra sutil en la línea del horizonte (asienta los edificios).
+    this.add.rectangle(0, groundY, GAME_W, 10, COLORS.dirt, 0.45).setOrigin(0, 0);
+
+    // Nubes a la deriva por el cielo (recorridas de lado a lado del lienzo).
+    const cloud1 = this.add.image(170, 150, 'cloud1').setScale(0.7).setAlpha(0.85);
+    const cloud2 = this.add.image(580, 250, 'cloud2').setScale(0.55).setAlpha(0.7);
+    this.driftCloud(cloud1, -140, GAME_W + 140, 30000);
+    this.driftCloud(cloud2, -140, GAME_W + 140, 40000);
+
+    // Skyline del pueblo con los edificios del pack: [clave, x, altura px].
+    const skyline: Array<[string, number, number]> = [
+      ['house1', 70, 104],
+      ['monastery', 188, 150],
+      ['castle', 348, 204],
+      ['tower', 486, 174],
+      ['house2', 582, 116],
+      ['barracks', 700, 150],
+      ['house3', 818, 116],
+      ['archery', 906, 128],
+    ];
+    for (const [key, x, h] of skyline) this.placeBuilding(key, x, groundY, h);
+
+    // Árboles (sprite animado del terreno) intercalados en el horizonte.
+    for (const x of [30, 270, 640, 880]) this.placeTree(x, groundY + 14, 132);
+
+    // Arbustos animados en primer plano.
+    for (const x of [320, 540, 760]) {
+      const b = this.add.sprite(x, groundY + 96, 'terrainBush').setOrigin(0.5, 1).setDisplaySize(58, 58);
+      b.play({ key: 'terrainBush', startFrame: Math.floor(Math.random() * 8) });
+      if (Math.random() > 0.5) b.setFlipX(true);
     }
-    // Sendero de tierra
-    field.add(this.add.rectangle(fx, fy + fh - 22, fw, 22, COLORS.dirt).setOrigin(0, 0));
 
-    // Nubes animadas (clip al campo)
-    const cloud1 = this.add.image(fx + 150, fy + 40, 'cloud1').setScale(0.6).setAlpha(0.7);
-    const cloud2 = this.add.image(fx + 500, fy + 70, 'cloud2').setScale(0.5).setAlpha(0.6);
-    field.add([cloud1, cloud2]);
-    this.driftCloud(cloud1, fx - 60, fx + fw + 60, 26000);
-    this.driftCloud(cloud2, fx - 60, fx + fw + 60, 34000);
+    // Montones de oro a ambos lados del primer plano.
+    this.add.image(150, groundY + 80, 'goldResource').setOrigin(0.5, 1).setScale(0.85);
+    this.add.image(GAME_W - 150, groundY + 80, 'goldResource').setOrigin(0.5, 1).setScale(0.85);
 
-    // Edificios de fondo
-    this.placeBuilding(field, 'castle', fx + 120, groundY, 150);
-    this.placeBuilding(field, 'tower', fx + 250, groundY, 130);
-    this.placeBuilding(field, 'barracks', fx + fw - 120, groundY, 140);
-
-    // Montones de oro
-    field.add(this.add.image(fx + 170, groundY - 6, 'goldResource').setOrigin(0.5, 1).setScale(0.8));
-    field.add(this.add.image(fx + fw - 170, groundY - 6, 'goldResource').setOrigin(0.5, 1).setScale(0.8));
-
-    // Caballeros sparring (sprites animados reales)
-    const blue = this.add.sprite(cx - 150, groundY, 'warriorBlue').setOrigin(0.5, 1).setScale(0.62).play('warriorBlue_idle');
-    const red = this.add
-      .sprite(cx + 150, groundY, 'warriorRed')
+    // Caballeros entrenando (sprites animados reales) en primer plano.
+    this.add
+      .sprite(cx - 165, groundY + 92, 'warriorBlue')
       .setOrigin(0.5, 1)
-      .setScale(0.62)
+      .setScale(0.72)
+      .play('warriorBlue_idle');
+    this.add
+      .sprite(cx + 165, groundY + 92, 'warriorRed')
+      .setOrigin(0.5, 1)
+      .setScale(0.72)
       .setFlipX(true)
       .play('warriorRed_idle');
-    field.add([blue, red]);
 
-    // Máscara para recortar nubes/sprites al marco del campo
-    const maskG = this.make.graphics({});
-    maskG.fillStyle(0xffffff);
-    maskG.fillRect(fx, fy, fw, fh);
-    field.setMask(maskG.createGeometryMask());
-
-    // Marco del campo (encima, sin máscara)
-    this.add.rectangle(cx, fy + fh / 2, fw, fh, 0x000000, 0).setStrokeStyle(3, COLORS.border);
+    // Velo oscuro inferior: asienta el bloque de botones sobre la escena sin
+    // tapar la acción (de transparente a oscuro hacia abajo).
+    const scrim = this.add.graphics();
+    scrim.fillGradientStyle(0x15110e, 0x15110e, 0x15110e, 0x15110e, 0, 0, 0.62, 0.62);
+    scrim.fillRect(0, GAME_H - 400, GAME_W, 400);
   }
 
-  private placeBuilding(
-    parent: Phaser.GameObjects.Container,
-    key: string,
-    x: number,
-    y: number,
-    targetH: number
-  ): void {
-    const img = this.add.image(x, y, key).setOrigin(0.5, 1);
+  private placeBuilding(key: string, x: number, baseY: number, targetH: number): void {
+    const img = this.add.image(x, baseY, key).setOrigin(0.5, 1);
     img.setScale(targetH / img.height);
-    parent.add(img);
+  }
+
+  private placeTree(x: number, baseY: number, h: number): void {
+    const w = h * (192 / 256);
+    const t = this.add.sprite(x, baseY, 'terrainTree').setOrigin(0.5, 1).setDisplaySize(w, h);
+    t.play({ key: 'terrainTree', startFrame: Math.floor(Math.random() * 8) });
+    if (Math.random() > 0.5) t.setFlipX(true);
   }
 
   private driftCloud(img: Phaser.GameObjects.Image, from: number, to: number, duration: number): void {

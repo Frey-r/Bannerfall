@@ -21,6 +21,7 @@ import {
   floatingGain,
   outcomeBanner,
 } from '../ui/widgets.ts';
+import { grassField } from '../ui/terrain.ts';
 import { loadUserData } from '../state.ts';
 import { deriveArmy, animKey, RANGED, UNIT_SIZE, ARMY_SIZE } from '../combat/army.ts';
 import type { UnitType, UnitColor } from '../combat/army.ts';
@@ -192,8 +193,15 @@ export class PvpCombatScene extends Phaser.Scene {
     const barB = hpBar(this, cx + 14, 396, 300, 1);
     this.setHp.red = barB.set;
 
-    // Campo de batalla.
-    this.add.rectangle(cx, 660, CONTENT_W, 470, COLORS.grassDark).setStrokeStyle(3, 0x2c2319);
+    // Campo de batalla: césped decorado con la línea de bosque al fondo y
+    // arbustos/rocas concentrados arriba para no estorbar los carriles de tropas.
+    grassField(this, cx, 660, CONTENT_W, 470, {
+      seed: this.hashSeed(`${a.id}:${b.id}`),
+      trees: 4,
+      bushes: 4,
+      rocks: 3,
+      decoTopOnly: true,
+    });
     this.placeArmy('blue');
     this.placeArmy('red');
 
@@ -207,6 +215,13 @@ export class PvpCombatScene extends Phaser.Scene {
     this.buildSkipControl();
 
     this.time.delayedCall(700, () => this.playRound(0));
+  }
+
+  /** Hash estable string->int para sembrar el reparto del césped. */
+  private hashSeed(s: string): number {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return Math.abs(h) || 1;
   }
 
   /* ---- Cabecera de cada bando --------------------------------- */

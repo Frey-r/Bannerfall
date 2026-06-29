@@ -101,15 +101,30 @@ import redWarriorIdle from './assets/sprites/Units/Red Units/Warrior/Warrior_Idl
 import blueArcherIdle from './assets/sprites/Units/Blue Units/Archer/Archer_Idle.png';
 import blueLancerIdle from './assets/sprites/Units/Blue Units/Lancer/Lancer_Idle.png';
 
-// Edificios
+// Edificios (Blue Buildings) — skyline del pueblo en la pantalla principal.
 import blueCastle from './assets/sprites/Buildings/Blue Buildings/Castle.png';
 import blueBarracks from './assets/sprites/Buildings/Blue Buildings/Barracks.png';
 import blueTower from './assets/sprites/Buildings/Blue Buildings/Tower.png';
+import blueHouse1 from './assets/sprites/Buildings/Blue Buildings/House1.png';
+import blueHouse2 from './assets/sprites/Buildings/Blue Buildings/House2.png';
+import blueHouse3 from './assets/sprites/Buildings/Blue Buildings/House3.png';
+import blueMonastery from './assets/sprites/Buildings/Blue Buildings/Monastery.png';
+import blueArchery from './assets/sprites/Buildings/Blue Buildings/Archery.png';
 
 // Terreno / Recursos
 import goldResource from './assets/sprites/Terrain/Resources/Gold/Gold Resource/Gold_Resource.png';
 import cloud1 from './assets/sprites/Terrain/Decorations/Clouds/Clouds_01.png';
 import cloud2 from './assets/sprites/Terrain/Decorations/Clouds/Clouds_02.png';
+
+// Terreno decorativo (campo de entrenamiento / batalla)
+import tilemapColor1 from './assets/sprites/Terrain/Tileset/Tilemap_color1.png';
+import treeSheet from './assets/sprites/Terrain/Resources/Wood/Trees/Tree1.png';
+import bushSheet from './assets/sprites/Terrain/Decorations/Bushes/Bushe1.png';
+import sheepIdleSheet from './assets/sprites/Terrain/Resources/Meat/Sheep/Sheep_Idle.png';
+import rock1 from './assets/sprites/Terrain/Decorations/Rocks/Rock1.png';
+import rock2 from './assets/sprites/Terrain/Decorations/Rocks/Rock2.png';
+import rock3 from './assets/sprites/Terrain/Decorations/Rocks/Rock3.png';
+import rock4 from './assets/sprites/Terrain/Decorations/Rocks/Rock4.png';
 
 // Partículas
 import explosion1 from './assets/sprites/Particle FX/Explosion_01.png';
@@ -124,6 +139,11 @@ export const SPRITE = {
   castle: blueCastle,
   barracks: blueBarracks,
   tower: blueTower,
+  house1: blueHouse1,
+  house2: blueHouse2,
+  house3: blueHouse3,
+  monastery: blueMonastery,
+  archery: blueArchery,
   goldResource,
   cloud1,
   cloud2,
@@ -224,5 +244,31 @@ export const ARROW: Record<UnitColor, string> = {
   blue: unitUrl(COLOR_FOLDER.blue, 'Archer', 'Arrow.png'),
   red: unitUrl(COLOR_FOLDER.red, 'Archer', 'Arrow.png'),
 };
+
+/* ============================================================
+   Terreno decorativo — campo de entrenamiento y batalla.
+   El tileset es un grid 64x64 (9 col x 6 fil); el tile de césped
+   central limpio (col 1, fila 1 = frame 10) tilea sin costuras y
+   se usa como fuente de un TileSprite. Árbol/arbusto/oveja son
+   spritesheets que se animan en bucle para dar vida al campo.
+   ============================================================ */
+export const TERRAIN = {
+  tileset: tilemapColor1,
+  tilesetKey: 'terrainTiles',
+  tileSize: 64,
+  tileCols: 9,
+  /** Tile de césped central (col 1, fila 1) — repite sin costuras. */
+  grassCenterFrame: 10,
+  /** Rocas estáticas (clave Phaser 'terrain_rock1'..'terrain_rock4'). */
+  rocks: { rock1, rock2, rock3, rock4 } as Record<string, string>,
+} as const;
+
+// Decoración animada del terreno (claves con prefijo `terrain` para no
+// colisionar con las unidades/FX). Tamaños medidos de cada PNG.
+export const TERRAIN_SHEETS: AnimSheet[] = [
+  { texKey: 'terrainTree', url: treeSheet, frameW: 192, frameH: 256, frames: 8, frameRate: 8, repeat: -1 },
+  { texKey: 'terrainBush', url: bushSheet, frameW: 128, frameH: 128, frames: 8, frameRate: 7, repeat: -1 },
+  { texKey: 'terrainSheep', url: sheepIdleSheet, frameW: 128, frameH: 128, frames: 6, frameRate: 6, repeat: -1 },
+];
 
 export { UI };

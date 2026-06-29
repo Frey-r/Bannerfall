@@ -4,8 +4,8 @@
    las alimenta al loader de Phaser y arranca HomeScene.
    ============================================================ */
 import Phaser from 'phaser';
-import { COLORS, hex, GAME_W, GAME_H, CONTENT_W, TEXT_RES } from '../ui/theme.ts';
-import { ICON, SPRITE, AVATARS, PANEL, UNIT_SHEETS, FX_SHEETS, ARROW, DICE } from '../assets.ts';
+import { COLORS, hex, GAME_W, GAME_H, CONTENT_W, TEXT_RES, fontPx } from '../ui/theme.ts';
+import { ICON, SPRITE, AVATARS, PANEL, UNIT_SHEETS, FX_SHEETS, TERRAIN, TERRAIN_SHEETS, ARROW, DICE } from '../assets.ts';
 import splashUrl from '../assets/bannerfall_splash.png';
 
 // Spritesheets animados (frames horizontales). Tamaños reales del pack:
@@ -22,6 +22,11 @@ const IMAGES: Record<string, string> = {
   castle: SPRITE.castle,
   barracks: SPRITE.barracks,
   tower: SPRITE.tower,
+  house1: SPRITE.house1,
+  house2: SPRITE.house2,
+  house3: SPRITE.house3,
+  monastery: SPRITE.monastery,
+  archery: SPRITE.archery,
   goldResource: SPRITE.goldResource,
   cloud1: SPRITE.cloud1,
   cloud2: SPRITE.cloud2,
@@ -46,9 +51,17 @@ export class BootScene extends Phaser.Scene {
         frameHeight: sheet.frameHeight,
       });
     }
-    // Unidades de combate + FX (Fase 2): spritesheets animados con clave `cu_`.
-    for (const s of [...UNIT_SHEETS, ...FX_SHEETS]) {
+    // Unidades de combate + FX (Fase 2) + decoración de terreno: spritesheets animados.
+    for (const s of [...UNIT_SHEETS, ...FX_SHEETS, ...TERRAIN_SHEETS]) {
       this.load.spritesheet(s.texKey, s.url, { frameWidth: s.frameW, frameHeight: s.frameH });
+    }
+    // Tileset de césped (grid 64x64, sin animar) + rocas estáticas del campo.
+    this.load.spritesheet(TERRAIN.tilesetKey, TERRAIN.tileset, {
+      frameWidth: TERRAIN.tileSize,
+      frameHeight: TERRAIN.tileSize,
+    });
+    for (const [name, url] of Object.entries(TERRAIN.rocks)) {
+      this.load.image(`terrain_${name}`, url);
     }
     this.load.image('cu_arrow_blue', ARROW.blue);
     this.load.image('cu_arrow_red', ARROW.red);
@@ -74,8 +87,8 @@ export class BootScene extends Phaser.Scene {
         repeat: -1,
       });
     }
-    // Anims de las unidades de combate y FX (clave de anim == clave de textura).
-    for (const s of [...UNIT_SHEETS, ...FX_SHEETS]) {
+    // Anims de las unidades de combate, FX y decoración de terreno (clave de anim == clave de textura).
+    for (const s of [...UNIT_SHEETS, ...FX_SHEETS, ...TERRAIN_SHEETS]) {
       this.anims.create({
         key: s.texKey,
         frames: this.anims.generateFrameNumbers(s.texKey, { start: 0, end: s.frames - 1 }),
@@ -94,10 +107,12 @@ export class BootScene extends Phaser.Scene {
     this.add
       .text(cx, cy - 70, 'TINY\nTACTICIANS', {
         fontFamily: '"Press Start 2P", monospace',
-        fontSize: '30px',
+        fontSize: `${fontPx(30)}px`,
         color: hex(COLORS.lime),
         align: 'center',
         lineSpacing: 14,
+        stroke: hex(COLORS.lime),
+        strokeThickness: Math.max(1, Math.round(fontPx(30) * 0.08)),
       })
       .setResolution(TEXT_RES)
       .setOrigin(0.5);
@@ -107,7 +122,7 @@ export class BootScene extends Phaser.Scene {
     this.add.rectangle(cx, cy + 40, barW + 8, barH + 8, COLORS.panelDark).setStrokeStyle(3, COLORS.border);
     const fill = this.add.rectangle(cx - barW / 2, cy + 40, 1, barH, COLORS.lime).setOrigin(0, 0.5);
     const pct = this.add
-      .text(cx, cy + 90, '0%', { fontFamily: '"Press Start 2P", monospace', fontSize: '16px', color: hex(COLORS.cream) })
+      .text(cx, cy + 90, '0%', { fontFamily: '"Press Start 2P", monospace', fontSize: `${fontPx(16)}px`, color: hex(COLORS.cream) })
       .setResolution(TEXT_RES)
       .setOrigin(0.5);
 

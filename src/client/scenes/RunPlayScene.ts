@@ -33,6 +33,7 @@ import {
   outcomeBanner,
 } from '../ui/widgets.ts';
 import { DiceRoller } from '../ui/diceRoller.ts';
+import { grassField } from '../ui/terrain.ts';
 import {
   stepRun,
   previewTurn,
@@ -261,8 +262,17 @@ export class RunPlayScene extends Phaser.Scene {
     const ph = 210;
 
     c.add(bodyText(this, PAD, 580, '* LIVE FEED', 17, COLORS.gold).setOrigin(0, 0.5));
-    c.add(this.add.rectangle(cx, py, CONTENT_W, ph, COLORS.panelDark).setStrokeStyle(3, COLORS.border));
-    c.add(this.add.rectangle(cx, py, CONTENT_W - 16, ph - 16, COLORS.grassDark).setStrokeStyle(2, 0x2c2319));
+    // Césped vivo: árboles de fondo, arbustos, rocas y una oveja pastando.
+    // Semilla derivada de la run => el campamento se ve igual entre turnos.
+    c.add(
+      grassField(this, cx, py, CONTENT_W, ph, {
+        seed: this.hashSeed(this.run.seed),
+        trees: 3,
+        bushes: 3,
+        rocks: 2,
+        sheep: true,
+      })
+    );
 
     c.add(this.add.image(cx - 300, py - 18, 'tower').setDisplaySize(112, 112));
     c.add(this.add.image(cx + 296, py + 6, 'barracks').setDisplaySize(140, 112));
@@ -271,6 +281,13 @@ export class RunPlayScene extends Phaser.Scene {
 
     c.add(portrait(this, cx, py - 12, this.run.name, 104, COLORS.gold));
     c.add(bodyText(this, cx, py + ph / 2 - 18, 'SECTOR 7G // TRAINING GROUND', 13, 0xcfe3a8).setAlpha(0.85));
+  }
+
+  /** Hash estable string->int para sembrar el reparto del césped. */
+  private hashSeed(s: string): number {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return Math.abs(h) || 1;
   }
 
   /* ---- 5. Tarjetas de entrenamiento (la apuesta) -------------- */

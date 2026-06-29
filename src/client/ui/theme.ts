@@ -75,3 +75,24 @@ export const TEXT_RES = Math.min(
   4,
   Math.max(2, Math.round((typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) * 1.5))
 );
+
+/** ¿Estamos en escritorio? (puntero fino = ratón). En escritorio el lienzo
+ *  portrait 3:4 se reduce mucho con Scale.FIT (la pantalla es apaisada y el
+ *  alto manda), así que los textos quedan diminutos. En móvil el lienzo llena
+ *  la columna y el tamaño base ya es legible. */
+export const IS_DESKTOP =
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(pointer: fine)').matches;
+
+/** Multiplicador de tamaño de fuente. En escritorio ampliamos para compensar
+ *  el reescalado FIT del lienzo portrait y que el texto siga siendo legible. */
+export const FONT_SCALE = IS_DESKTOP ? 1.35 : 1;
+
+/** Aplica FONT_SCALE y redondea (tamaños enteros = glifos pixel más nítidos).
+ *  Único punto donde se escala el texto: los widgets que derivan geometría del
+ *  tamaño de fuente (botón, cabecera) deben usar esto para medir/dimensionar y
+ *  pasar el tamaño BASE a titleText/bodyText, que vuelven a aplicar fontPx. */
+export function fontPx(size: number): number {
+  return Math.round(size * FONT_SCALE);
+}

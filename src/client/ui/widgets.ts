@@ -5,7 +5,7 @@
    poder posicionarlos/animarlos como una sola unidad.
    ============================================================ */
 import Phaser from 'phaser';
-import { COLORS, FONT, hex, PAD, TOUCH_H, TEXT_RES } from './theme.ts';
+import { COLORS, FONT, hex, PAD, TOUCH_H, TEXT_RES, fontPx } from './theme.ts';
 import { avatarKeyFor } from '../assets.ts';
 
 type Scene = Phaser.Scene;
@@ -154,11 +154,17 @@ export function titleText(
   size = 18,
   color: number = COLORS.cream
 ): Phaser.GameObjects.Text {
+  const px = fontPx(size);
   return scene.add
     .text(x, y, str, {
       fontFamily: FONT.title,
-      fontSize: `${size}px`,
+      fontSize: `${px}px`,
       color: hex(color),
+      // Trazo del mismo color = engrosado (faux-bold). Press Start 2P es una
+      // fuente pixel de un solo peso; el contorno le da cuerpo sin perder el
+      // look retro. Proporcional al tamaño para que no embarre los glifos.
+      stroke: hex(color),
+      strokeThickness: Math.max(1, Math.round(px * 0.08)),
     })
     .setResolution(TEXT_RES)
     .setOrigin(0.5)
@@ -173,12 +179,17 @@ export function bodyText(
   size = 18,
   color: number = COLORS.ink
 ): Phaser.GameObjects.Text {
+  const px = fontPx(size);
   return scene.add
     .text(x, y, str, {
       fontFamily: FONT.body,
-      fontSize: `${size}px`,
+      fontSize: `${px}px`,
       color: hex(color),
       fontStyle: 'bold',
+      // Engrosado extra: JetBrains Mono bold (700) sigue siendo fino al
+      // reducirse el lienzo; el trazo lo lleva a un peso ~800 percibido.
+      stroke: hex(color),
+      strokeThickness: Math.max(1, Math.round(px * 0.06)),
     })
     .setResolution(TEXT_RES)
     .setOrigin(0.5);
@@ -202,13 +213,16 @@ export function retroButton(
   opts: ButtonOpts = {}
 ): Phaser.GameObjects.Container {
   const fontSize = opts.fontSize ?? 16;
+  // Geometría a partir del tamaño YA escalado (titleText vuelve a aplicar
+  // fontPx al renderizar la etiqueta, así medida y render coinciden).
+  const px = fontPx(fontSize);
   const padX = 28;
   const measure = scene.add
-    .text(0, 0, label, { fontFamily: FONT.title, fontSize: `${fontSize}px` })
+    .text(0, 0, label, { fontFamily: FONT.title, fontSize: `${px}px` })
     .setVisible(false);
   const w = opts.width ?? Math.max(140, Math.ceil(measure.width) + padX * 2);
   // Altura mínima táctil para móvil (los botones se tocan con el dedo).
-  const h = opts.height ?? Math.max(TOUCH_H, fontSize * 2 + 26);
+  const h = opts.height ?? Math.max(TOUCH_H, px * 2 + 26);
   measure.destroy();
 
   const enabled = opts.enabled !== false;
@@ -355,7 +369,7 @@ export function headerBar(
   label: string,
   fontSize = 16
 ): Phaser.GameObjects.Container {
-  const h = fontSize * 2 + 12;
+  const h = fontPx(fontSize) * 2 + 12;
   const container = scene.add.container(x, y);
   const body = scene.add.rectangle(0, 0, w, h, COLORS.maroon).setStrokeStyle(3, COLORS.border);
   const top = scene.add.rectangle(0, -h / 2 + 3, w - 6, 3, COLORS.maroonTop);
