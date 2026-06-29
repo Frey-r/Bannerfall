@@ -10,15 +10,16 @@ App de Devvit: **`tiny-tacticians`** · Cliente **Phaser 4** · Servidor **Devvi
 
 ## ⏱️ Del primer commit al cierre de la jam
 
-| Hito | Marca de tiempo |
-|------|-----------------|
-| **Inicio del proyecto** (primer commit) | `2026-06-22 10:48` |
-| **Final de la hackatón** (último commit) | `2026-06-28 23:48` |
-| **Tiempo total transcurrido** | **≈ 6 días y 13 horas** (del 22 al 28 de junio de 2026) |
+| Hito | Fecha |
+|------|-------|
+| **Inicio del proyecto** (primer commit) | `2026-06-22` |
+| **Cierre de la hackatón** (fecha límite de entrega) | `2026-07-15` |
+| **Ventana total de la jam** | **≈ 23 días** (del 22 de junio al 15 de julio de 2026) |
 
-Todo lo que sigue —motor determinista, anti-cheat estructural, PvP asíncrono, meta-progresión,
+Todo el sistema —motor determinista, anti-cheat estructural, PvP asíncrono, meta-progresión,
 eventos diarios por scheduler, 9 escenas de Phaser y una suite de 13 conjuntos de pruebas— se
-diseñó, especificó e implementó dentro de esa ventana de poco más de seis días.
+diseña, especifica e implementa dentro de esa ventana de ~23 días. *(El primer commit cargó el
+andamiaje el 22 de junio; el desarrollo continúa hasta la entrega del 15 de julio.)*
 
 ---
 
@@ -235,4 +236,4 @@ npm run playtest     # playtest en un subreddit
 
 ---
 
-<sub>Construido para una hackatón entre el 22 y el 28 de junio de 2026 · App de Devvit `tiny-tacticians`.</sub>
+<sub>Construido para una hackatón del 22 de junio al 15 de julio de 2026 · App de Devvit `tiny-tacticians`.</sub>
