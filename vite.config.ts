@@ -21,5 +21,10 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, './dist/client'),
     emptyOutDir: true,
+    // No incrustar assets como base64 en el JS: incluso los PNG pequeños (<4 kB
+    // por defecto) engordan el bundle ~33% (overhead base64) y no se cachean por
+    // separado. Con 0, TODOS los assets se emiten como ficheros hasheados aparte,
+    // adelgazando el chunk JS. Phaser NO se toca (es JS, no un asset).
+    assetsInlineLimit: 0,
   },
 });

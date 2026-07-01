@@ -64,16 +64,12 @@ export function avatarKeyFor(seed: string): string {
 
 /* ---- Paneles nine-slice (border-image) ------------------------- */
 // Re-exportamos como URL para usarlos en estilos inline cuando haga falta.
-import bigRedBtn from './assets/sprites/UI Elements/UI Elements/Buttons/BigRedButton_Regular.png';
-import bigBlueBtn from './assets/sprites/UI Elements/UI Elements/Buttons/BigBlueButton_Regular.png';
 import regularPaper from './assets/sprites/UI Elements/UI Elements/Papers/RegularPaper.png';
 import specialPaper from './assets/sprites/UI Elements/UI Elements/Papers/SpecialPaper.png';
 import banner from './assets/sprites/UI Elements/UI Elements/Banners/Banner.png';
 import dicesSprite from './assets/sprites/UI Elements/UI Dices/dices_sprite.png';
 
 export const PANEL = {
-  buttonRed: bigRedBtn,
-  buttonBlue: bigBlueBtn,
   paper: regularPaper,
   paperSpecial: specialPaper,
   banner,
