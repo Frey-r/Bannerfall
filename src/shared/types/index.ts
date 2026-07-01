@@ -56,6 +56,24 @@ export interface GeneralStats {
 export type TurnOutcome = 'fail' | 'normal' | 'crit';
 
 /**
+ * Resultado de un encuentro de combate (checkpoint determinista de la run).
+ * No es un turno del actionLog: se resuelve TRAS procesar `afterTurn` comparando
+ * las stats actuales contra un enemigo equilibrado. El 4º es el jefe.
+ */
+export interface EncounterResult {
+  index: number; // 0..3
+  afterTurn: number; // se resuelve tras procesar este turno (0-based)
+  enemyName: string;
+  enemyPower: number;
+  isBoss: boolean;
+  won: boolean;
+  playerPower: number; // poder del recluta al enfrentarlo
+  /** Batalla 1v1 determinista que resolvió el encuentro; alimenta el
+   *  visualizador de combate (PvpCombatScene) sin re-simular en el cliente. */
+  battle: BattleResult;
+}
+
+/**
  * Lo que ocurrió en un turno, producido por `stepRun`. Es la ÚNICA fuente de
  * verdad tanto para acuñar (servidor) como para el feedback por acción (cliente).
  */
@@ -77,17 +95,29 @@ export interface TurnResult {
   activeIds?: string[];
   /** Efectos de run que detonaron este turno (consejero activo con runEffect). */
   advisorProcs?: { id: string; effectId: string; label: string }[];
+  /** Ánimo (moral) ANTES y DESPUÉS del turno; `moodAfter` ya incluye la bajada
+   *  por un encuentro perdido en esta frontera. El ánimo reforma el dado. */
+  moodBefore?: number;
+  moodAfter?: number;
+  /** Encuentro que se resolvió TRAS este turno (si la frontera coincide). */
+  encounter?: EncounterResult;
 }
 
 /** Estado completo re-derivado de una run desde seed + deck + actionLog. */
 export interface RunSimResult {
   stats: GeneralStats;
   energy: number;
+  /** Ánimo (moral) final; reforma el dado durante la run. */
+  mood: number;
   turns: TurnResult[];
   /** Bond ("afinidad") acumulado por consejero en esta run (por-run, no se persiste). */
   bond: Record<string, number>;
   /** Habilidades de combate desbloqueadas por bond, para acuñar el general. */
   unlockedAbilities: string[];
+  /** Encuentros resueltos hasta el punto simulado (0..4, en orden). */
+  encounters: EncounterResult[];
+  /** ¿Se derrotó al jefe? → otorga el bono final de +10 a todo al acuñar. */
+  bonusEarned: boolean;
 }
 
 export interface General {

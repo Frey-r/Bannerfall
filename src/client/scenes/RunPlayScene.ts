@@ -41,11 +41,13 @@ import {
   eventForTurn,
   calculatePower,
   activeAdvisorsForTurn,
+  applyEncounterBonus,
   BASE_STAT,
   ENERGY_MAX,
   RUN_TURNS,
   BOND_THRESHOLD,
   CONSEJERO_ABILITY,
+  MOOD_START,
 } from '../../shared/sim/index.ts';
 import { loadUserData } from '../state.ts';
 import { api } from '../api.ts';
@@ -53,6 +55,7 @@ import type {
   Affinity,
   ActionLog,
   Consejero,
+  EncounterResult,
   GeneralStats,
   TurnResult,
 } from '../../shared/types/index.ts';
@@ -64,13 +67,13 @@ interface RunData {
   advisors: Consejero[];
 }
 
-const MOOD_MAX = 1.5;
-
-/** Paleta de cada tarjeta de stat (OFE rojo, DEF verde, MAN azul). */
+/** Paleta de cada tarjeta de stat = color del TIPO de entrenamiento
+ *  (OFE rojo, DEF azul, MAN morado), idéntico al tinte de los retratos de
+ *  asesores (`affinityColor`) y a los colores de contrato. */
 const STAT_PALETTE: Record<Affinity, { fill: number; top: number; edge: number; text: number }> = {
-  OFE: { fill: 0x9a3b34, top: 0xb85048, edge: 0x5e211c, text: COLORS.cream },
-  DEF: { fill: COLORS.lime, top: COLORS.limeTop, edge: COLORS.limeEdge, text: COLORS.ink },
-  MAN: { fill: 0x2f6aa3, top: 0x4a86c0, edge: 0x1c466b, text: COLORS.cream },
+  OFE: { fill: COLORS.affOFE, top: COLORS.affOFETop, edge: COLORS.affOFEEdge, text: COLORS.cream },
+  DEF: { fill: COLORS.affDEF, top: COLORS.affDEFTop, edge: COLORS.affDEFEdge, text: COLORS.cream },
+  MAN: { fill: COLORS.affMAN, top: COLORS.affMANTop, edge: COLORS.affMANEdge, text: COLORS.cream },
 };
 
 const STAT_KEY: Record<Affinity, keyof GeneralStats> = { OFE: 'ofe', DEF: 'def', MAN: 'man' };
@@ -81,8 +84,13 @@ export class RunPlayScene extends Phaser.Scene {
   private stats: GeneralStats = { ofe: BASE_STAT, def: BASE_STAT, man: BASE_STAT };
   private actionLog: ActionLog = [];
   private energy = ENERGY_MAX;
-  private mood = 1.0;
+  private mood = MOOD_START;
   private bond: Record<string, number> = {};
+  /** Encuentros resueltos por la simulación hasta el turno actual. */
+  private encounters: EncounterResult[] = [];
+  private bonusEarned = false;
+  /** Índices de encuentro ya REVELADOS al jugador (no re-mostrar en re-render). */
+  private shownEncounters = new Set<number>();
   /** Consejeros que ASISTEN este turno (set activo determinista por seed+turno). */
   private activeThisTurn = new Set<string>();
   private busy = false;
@@ -99,8 +107,11 @@ export class RunPlayScene extends Phaser.Scene {
     this.stats = { ofe: BASE_STAT, def: BASE_STAT, man: BASE_STAT };
     this.actionLog = [];
     this.energy = ENERGY_MAX;
-    this.mood = 1.0;
+    this.mood = MOOD_START;
     this.bond = {};
+    this.encounters = [];
+    this.bonusEarned = false;
+    this.shownEncounters = new Set<number>();
     this.activeThisTurn = new Set<string>();
     this.busy = false;
   }
@@ -152,10 +163,15 @@ export class RunPlayScene extends Phaser.Scene {
 
     const moodW = CONTENT_W - turnW - 16;
     const moodX = GAME_W - PAD - moodW / 2;
-    const face = this.mood >= 1.2 ? ':D' : this.mood >= 0.9 ? ':)' : ':(';
+    // El ánimo reforma el dado (no multiplica la ganancia): mostramos un
+    // descriptor cualitativo cuyas bandas coinciden con moodDiceShift.
+    const face = this.mood >= 1.1 ? ':D' : this.mood >= 0.9 ? ':)' : ':(';
+    const moodLabel =
+      this.mood >= 1.3 ? 'ALTO' : this.mood >= 1.1 ? 'BUENO' : this.mood >= 0.9 ? 'NORMAL' : this.mood >= 0.7 ? 'BAJO' : 'PÉSIMO';
+    const moodCol = this.mood >= 1.1 ? 0x2e6b2e : this.mood >= 0.9 ? COLORS.ink : COLORS.danger;
     c.add(retroPanel(this, moodX, 152, moodW, 92, COLORS.card));
     c.add(titleText(this, moodX, 132, 'ANIMO', 14, COLORS.ink));
-    c.add(bodyText(this, moodX, 168, `${face}  x${this.mood.toFixed(1)}`, 20, COLORS.ink));
+    c.add(bodyText(this, moodX, 168, `${face}  ${moodLabel}`, 20, moodCol));
 
     // Barra de energía (ahora REAL: gobierna el riesgo de fallo).
     const pct = this.energy / ENERGY_MAX;
@@ -321,7 +337,7 @@ export class RunPlayScene extends Phaser.Scene {
     const W = 236;
     const H = 236;
     const pal = STAT_PALETTE[choice];
-    const pv = previewTurn(this.run.seed, this.run.advisors, choice, this.energy, this.turn);
+    const pv = previewTurn(this.run.seed, this.run.advisors, choice, this.energy, this.turn, this.mood);
     const risky = pv.successPct < 0.7;
 
     const card = this.add.container(x, y);
@@ -410,17 +426,32 @@ export class RunPlayScene extends Phaser.Scene {
   /* ---- Estado final: acuñar ------------------------------------ */
   private completion(c: Phaser.GameObjects.Container): void {
     const cx = GAME_W / 2;
+
+    // El jefe (4º encuentro) se enfrenta al cerrar la campaña, antes de acuñar.
+    const boss = this.encounters.find((e) => e.isBoss);
+    if (boss && !this.shownEncounters.has(boss.index)) {
+      this.shownEncounters.add(boss.index);
+      this.showEncounterOverlay(boss, () => this.render());
+    }
+
+    // Resumen de acuñación con el bono del jefe YA aplicado (paridad con el servidor).
+    const finalStats = applyEncounterBonus(this.stats, this.bonusEarned);
     c.add(titleText(this, cx, 996, 'ENTRENAMIENTO COMPLETO', 20, COLORS.gold));
     c.add(
       bodyText(this, cx, 1050, 'Tu recluta terminó la campaña. Acuña la unidad\ninmutable para enviarla al combate.', 16, COLORS.cream).setAlign(
         'center'
       )
     );
-    c.add(titleText(this, cx, 1112, `PODER  ${calculatePower(this.stats)}`, 22, COLORS.cream));
+    c.add(titleText(this, cx, 1108, `PODER  ${calculatePower(finalStats)}`, 22, COLORS.cream));
+    if (this.bonusEarned) {
+      c.add(bodyText(this, cx, 1146, '★ BONO DEL JEFE: +10 A TODAS LAS STATS', 14, COLORS.gold));
+    } else if (boss) {
+      c.add(bodyText(this, cx, 1146, 'Sin bono del jefe (no derrotaste al boss).', 13, COLORS.danger));
+    }
     c.add(
-      retroButton(this, cx, 1200, 'ACUÑAR GENERAL', {
+      retroButton(this, cx, 1212, 'ACUÑAR GENERAL', {
         width: CONTENT_W,
-        height: 88,
+        height: 84,
         fontSize: 20,
         onClick: () => this.submit(),
       })
@@ -434,15 +465,17 @@ export class RunPlayScene extends Phaser.Scene {
     const res = stepRun(this.run.seed, this.run.advisors, this.actionLog);
     this.stats = res.stats;
     this.energy = res.energy;
+    this.mood = res.mood; // autoritativo: el ánimo ya incluye el efecto de los encuentros
     this.bond = res.bond;
+    this.encounters = res.encounters;
+    this.bonusEarned = res.bonusEarned;
     return res.turns[res.turns.length - 1];
   }
 
   private train(choice: Affinity): void {
     if (this.busy || this.turn >= RUN_TURNS || isEventTurn(this.run.seed, this.turn)) return;
     this.actionLog.push({ kind: 'train', choice });
-    const tr = this.recompute();
-    this.applyMood(tr);
+    const tr = this.recompute(); // el ánimo (this.mood) ya quedó actualizado por la sim
     this.turn += 1;
     this.render();
     this.playDiceThenFeedback(tr);
@@ -452,10 +485,10 @@ export class RunPlayScene extends Phaser.Scene {
     if (this.busy || this.turn >= RUN_TURNS || isEventTurn(this.run.seed, this.turn)) return;
     this.actionLog.push({ kind: 'rest' });
     const tr = this.recompute();
-    this.mood = Math.min(MOOD_MAX, this.mood + 0.05);
     this.turn += 1;
     this.render();
     floatingGain(this, GAME_W / 2, 520, `+${tr.energyAfter - tr.energyBefore} ENERGÍA`, COLORS.lime, 20);
+    this.maybeShowEncounter(tr.turn);
   }
 
   private chooseEvent(branch: 0 | 1): void {
@@ -474,7 +507,7 @@ export class RunPlayScene extends Phaser.Scene {
       outcomeBanner(this, tr.event.name, col, negative);
       toast(this, tr.event.outcomeText, col);
       this.showStatDeltas(tr);
-      this.mood = Phaser.Math.Clamp(this.mood + (negative ? -0.1 : positive ? 0.1 : 0), 0.5, MOOD_MAX);
+      this.maybeShowEncounter(tr.turn);
     };
 
     if (tr.dice) {
@@ -503,12 +536,14 @@ export class RunPlayScene extends Phaser.Scene {
           this.busy = false;
           this.showTrainFeedback(tr);
           this.flashUnlocks(tr);
+          this.maybeShowEncounter(tr.turn);
         },
       });
       this.roller.roll(tr.dice);
     } else {
       this.showTrainFeedback(tr);
       this.flashUnlocks(tr);
+      this.maybeShowEncounter(tr.turn);
     }
   }
 
@@ -555,10 +590,81 @@ export class RunPlayScene extends Phaser.Scene {
     });
   }
 
-  private applyMood(tr: TurnResult): void {
-    if (tr.kind !== 'train') return;
-    if (tr.outcome === 'crit') this.mood = Math.min(MOOD_MAX, this.mood + 0.1);
-    else if (tr.outcome === 'fail') this.mood = Math.max(0.5, this.mood - 0.15);
+  /* ---- Encuentros de combate (overlay de revelación) ----------- */
+  /** Muestra el encuentro NO-jefe que se resolvió tras `turnDone` (una sola vez). */
+  private maybeShowEncounter(turnDone: number): void {
+    const enc = this.encounters.find(
+      (e) => e.afterTurn === turnDone && !e.isBoss && !this.shownEncounters.has(e.index)
+    );
+    if (!enc) return;
+    this.shownEncounters.add(enc.index);
+    this.showEncounterOverlay(enc);
+  }
+
+  /** Modal de encuentro: enemigo + poderes + BATALLAR; al pulsar revela el resultado. */
+  private showEncounterOverlay(enc: EncounterResult, onClose?: () => void): void {
+    this.busy = true;
+    const w = this.scale.width;
+    const h = this.scale.height;
+    const cx = w / 2;
+    const cy = h * 0.42;
+    const layer = this.add.container(0, 0).setDepth(700);
+    const dim = this.add.rectangle(0, 0, w, h, 0x15110e, 0.84).setOrigin(0, 0).setInteractive();
+    const panel = retroPanel(this, cx, cy, CONTENT_W, 430, COLORS.card);
+    const heading = enc.isBoss ? 'JEFE FINAL' : `ENCUENTRO ${enc.index + 1} / 4`;
+    const tint = enc.isBoss ? COLORS.danger : COLORS.affOFE;
+    layer.add([
+      dim,
+      panel,
+      titleText(this, cx, cy - 175, heading, 18, enc.isBoss ? COLORS.danger : COLORS.ink),
+      portrait(this, cx, cy - 78, enc.enemyName, 124, tint),
+      titleText(this, cx, cy + 4, enc.enemyName, 18, COLORS.ink),
+      bodyText(this, cx, cy + 44, `PODER ENEMIGO ${enc.enemyPower}    ·    TU PODER ${enc.playerPower}`, 14, COLORS.ink),
+    ]);
+    const btn = retroButton(this, cx, cy + 150, 'BATALLAR', {
+      variant: 'maroon',
+      width: CONTENT_W - 80,
+      height: 74,
+      fontSize: 18,
+      onClick: () => {
+        btn.destroy();
+        this.revealEncounter(enc, layer, () => {
+          layer.destroy();
+          this.busy = false;
+          onClose?.();
+        });
+      },
+    });
+    layer.add(btn);
+  }
+
+  /** Revela VICTORIA/DERROTA dentro del modal (la moral ya viene aplicada por la sim). */
+  private revealEncounter(enc: EncounterResult, layer: Phaser.GameObjects.Container, done: () => void): void {
+    const cx = this.scale.width / 2;
+    const cy = this.scale.height * 0.42;
+    const col = enc.won ? COLORS.gold : COLORS.danger;
+    outcomeBanner(this, enc.won ? '¡VICTORIA!' : 'DERROTA', col, !enc.won);
+    const verdict = enc.won
+      ? enc.isBoss
+        ? '¡Jefe derrotado! +10 a TODAS las estadísticas al acuñar.'
+        : 'Encuentro superado. La moral del equipo sube.'
+      : enc.isBoss
+        ? 'El jefe te supera. Pierdes el bono de +10 (conservas a tu general).'
+        : 'Derrota. ¡LA MORAL DEL EQUIPO SE DESPLOMA!';
+    layer.add(
+      bodyText(this, cx, cy + 92, verdict, 14, enc.won ? 0x2e6b2e : COLORS.danger)
+        .setWordWrapWidth(CONTENT_W - 110)
+        .setAlign('center')
+    );
+    layer.add(
+      retroButton(this, cx, cy + 165, 'CONTINUAR', {
+        variant: enc.won ? 'lime' : 'grey',
+        width: CONTENT_W - 80,
+        height: 64,
+        fontSize: 16,
+        onClick: done,
+      })
+    );
   }
 
   private async submit(): Promise<void> {

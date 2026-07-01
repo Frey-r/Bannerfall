@@ -36,10 +36,18 @@ export const COLORS = {
   danger: 0xc2402f,
   border: 0x000000,
 
-  // Tintes por afinidad de consejero
+  // Tintes por afinidad de consejero (= color del TIPO de entrenamiento).
+  // OFE rojo, DEF azul, MAN morado — coinciden con los retratos de asesores y
+  // los colores de contrato. Cada uno con bisel top/edge para las tarjetas.
   affOFE: 0xa83b34,
+  affOFETop: 0xc4554d,
+  affOFEEdge: 0x661f1a,
   affDEF: 0x2f6aa3,
+  affDEFTop: 0x4a86c0,
+  affDEFEdge: 0x1c466b,
   affMAN: 0x7a45a8,
+  affMANTop: 0x9a63c8,
+  affMANEdge: 0x4e2a70,
 } as const;
 
 /** Convierte 0xRRGGBB a string CSS '#rrggbb'. */

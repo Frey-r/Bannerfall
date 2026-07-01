@@ -1,4 +1,4 @@
-import { GeneralStats, Consejero, Affinity } from '../types/index.ts';
+import { GeneralStats, Consejero, Affinity, General } from '../types/index.ts';
 import { PRNG } from './prng.ts';
 import {
   DiceRoll,
@@ -30,6 +30,58 @@ export const REST_GAIN = 45; // energía que recupera un descanso (consume el tu
 export const SAFE_ENERGY = 55;
 export const CRIT_MULT = 1.8; // multiplicador de ganancia en crítico
 export const EVENT_COUNT = 3; // turnos de evento por run
+
+/* ---- Ánimo (moral): variable de simulación que REFORMA el dado --------
+   Vive en stepRun (determinista, como la energía). NO multiplica la
+   ganancia: desplaza los umbrales del d6 (alto → menos fallo / más
+   crítico; bajo → más fallo). Como shiftThresholds no consume PRNG, la
+   secuencia de caras no cambia: solo qué banda le toca a cada cara. */
+export const MOOD_START = 1.0;
+export const MOOD_MIN = 0.5;
+export const MOOD_MAX = 1.5;
+export const MOOD_CRIT = 0.1; // entrenamiento crítico sube el ánimo
+export const MOOD_FAIL = -0.15; // entrenamiento fallido lo baja
+export const MOOD_REST = 0.05; // descansar lo recupera un poco
+export const MOOD_EVENT = 0.1; // resultado de evento (±)
+export const MOOD_ENCOUNTER_LOSS = -0.5; // perder un encuentro lo DESPLOMA
+export const MOOD_ENCOUNTER_WIN = 0.1; // ganar un encuentro lo sube
+
+export type MoodEvent =
+  | 'crit'
+  | 'fail'
+  | 'rest'
+  | 'eventPos'
+  | 'eventNeg'
+  | 'encounterLoss'
+  | 'encounterWin';
+
+const MOOD_DELTA: Record<MoodEvent, number> = {
+  crit: MOOD_CRIT,
+  fail: MOOD_FAIL,
+  rest: MOOD_REST,
+  eventPos: MOOD_EVENT,
+  eventNeg: -MOOD_EVENT,
+  encounterLoss: MOOD_ENCOUNTER_LOSS,
+  encounterWin: MOOD_ENCOUNTER_WIN,
+};
+
+/** Aplica el delta de ánimo del evento dado y acota a [MOOD_MIN, MOOD_MAX]. */
+export function nextMood(mood: number, event: MoodEvent): number {
+  return Math.max(MOOD_MIN, Math.min(MOOD_MAX, mood + MOOD_DELTA[event]));
+}
+
+/**
+ * El ánimo reforma el d6 (deltas enteros de umbral, neutro en 1.0):
+ * alto → baja failMax y/o critMin (menos fallo, más crítico);
+ * bajo → sube failMax (más fallo). Se pliega en planTrainTurn.
+ */
+export function moodDiceShift(mood: number): { failMaxDelta: number; critMinDelta: number } {
+  if (mood >= 1.3) return { failMaxDelta: -1, critMinDelta: -1 };
+  if (mood >= 1.1) return { failMaxDelta: 0, critMinDelta: -1 };
+  if (mood >= 0.9) return { failMaxDelta: 0, critMinDelta: 0 };
+  if (mood >= 0.7) return { failMaxDelta: 1, critMinDelta: 0 };
+  return { failMaxDelta: 2, critMinDelta: 0 };
+}
 
 /* ---- Dados: umbrales base del d6 (tunables) ---------------------- */
 // Por defecto: cara 1 = FALLO, caras 2..5 = NORMAL, cara 6 = CRÍTICO.
@@ -209,8 +261,14 @@ export interface TrainTurnPlan {
   procs: { id: string; effectId: RunEffectId; label: string }[];
 }
 
-/** Arma el turno desde los consejeros ACTIVOS: arquetipos reforman el dado, efectos de run se pliegan. */
-export function planTrainTurn(participants: Consejero[], choice: Affinity, energy: number): TrainTurnPlan {
+/** Arma el turno desde los consejeros ACTIVOS: arquetipos reforman el dado, efectos de run se pliegan.
+ *  `mood` (ánimo) también reforma el dado vía moodDiceShift; default 1.0 = neutro (preview/legacy). */
+export function planTrainTurn(
+  participants: Consejero[],
+  choice: Affinity,
+  energy: number,
+  mood = 1.0
+): TrainTurnPlan {
   let totalFloor = 0;
   let totalCritDown = 0;
   let totalFailUp = 0;
@@ -250,8 +308,9 @@ export function planTrainTurn(participants: Consejero[], choice: Affinity, energ
   let roll = baseRoll({ failMax: BASE_FAIL_MAX, critMin: BASE_CRIT_MIN });
   if (totalFloor > 0) roll = restrictRange(roll, 1 + totalFloor, 6);
   if (capTop) roll = restrictRange(roll, 1, 5); // bloquea la cara 6 (limita CRÍTICO)
-  const dFailMax = energyFailShift(energy) + totalFailUp + reFailDelta;
-  const dCritMin = -totalCritDown + reCritDelta;
+  const ms = moodDiceShift(mood);
+  const dFailMax = energyFailShift(energy) + totalFailUp + reFailDelta + ms.failMaxDelta;
+  const dCritMin = -totalCritDown + reCritDelta + ms.critMinDelta;
   roll = shiftThresholds(roll, dFailMax, dCritMin);
   if (extra > 0) roll = addDice(roll, extra, 'best');
 
@@ -496,4 +555,85 @@ export function isEventTurn(seed: string, turn: number): boolean {
 export function eventForTurn(seed: string, turn: number): BranchingEvent {
   const p = new PRNG(`${seed}:evtpick:${turn}`);
   return BRANCHING_EVENTS[p.nextInt(0, BRANCHING_EVENTS.length - 1)];
+}
+
+/* ============================================================
+   Encuentros de combate — checkpoints deterministas de la run.
+   NO son turnos del actionLog: se resuelven en fronteras fijas
+   (tras procesar ciertos turnos) comparando las stats ACTUALES
+   contra un enemigo equilibrado. El último es un JEFE de 120 de
+   poder; derrotarlo otorga el bono final de +10 a todo. La
+   aleatoriedad del combate sale de un PRNG DERIVADO
+   (`seed:enc:<frontera>`), así el stream principal no se altera.
+   ============================================================ */
+export const ENCOUNTER_COUNT = 4;
+export const BOSS_POWER = 120;
+export const ENCOUNTER_POWERS = [50, 80, 100, BOSS_POWER];
+export const ENCOUNTER_AFTER_TURNS = [3, 7, 11, RUN_TURNS - 1];
+export const ENCOUNTER_BONUS = 10; // +stat a TODO al derrotar al jefe
+
+const ENCOUNTER_NAMES = ['Partida de Saqueadores', 'Compañía Mercenaria', 'Vanguardia Enemiga'];
+const BOSS_NAME = 'Señor de la Guerra';
+
+export interface EncounterDef {
+  index: number;
+  afterTurn: number; // se resuelve TRAS procesar este turno (0-based)
+  isBoss: boolean;
+  power: number;
+  name: string;
+}
+
+/** Los 4 encuentros de una run (posiciones/poderes fijos; el último es el jefe). */
+export function encounterDefs(): EncounterDef[] {
+  return ENCOUNTER_AFTER_TURNS.map((afterTurn, index) => {
+    const isBoss = index === ENCOUNTER_COUNT - 1;
+    return {
+      index,
+      afterTurn,
+      isBoss,
+      power: ENCOUNTER_POWERS[index],
+      name: isBoss ? BOSS_NAME : (ENCOUNTER_NAMES[index] ?? `Encuentro ${index + 1}`),
+    };
+  });
+}
+
+/** El encuentro que dispara TRAS procesar `turn`, si lo hay. */
+export function encounterAfterTurn(turn: number): EncounterDef | undefined {
+  return encounterDefs().find((e) => e.afterTurn === turn);
+}
+
+/** Reparto casi uniforme de stats tal que `calculatePower(stats) === target`. */
+export function balancedStatsForPower(target: number): GeneralStats {
+  const man = Math.round(target / 3.2); // man pesa x1.2 en el poder
+  const rest = target - Math.floor(man * 1.2); // puntos restantes para ofe + def
+  const ofe = Math.ceil(rest / 2);
+  const def = rest - ofe;
+  return { ofe, def, man };
+}
+
+/** Enemigo de un encuentro: stats equilibradas + habilidades por umbral. Sin RNG. */
+export function makeEnemyGeneral(seed: string, def: EncounterDef): General {
+  const stats = balancedStatsForPower(def.power);
+  return {
+    id: `enemy_enc${def.index}`,
+    ownerId: '',
+    name: def.name,
+    stats,
+    power: calculatePower(stats),
+    tier: calculateTier(def.power),
+    abilities: deriveAbilities(stats),
+    seed: `${seed}:enc:${def.afterTurn}`,
+    schemaVersion: SIM_VERSION,
+    createdAt: 0,
+  };
+}
+
+/** Suma el bono +10 a todas las stats si se derrotó al jefe; clamp a MAX_STAT. */
+export function applyEncounterBonus(stats: GeneralStats, bonusEarned: boolean): GeneralStats {
+  if (!bonusEarned) return { ...stats };
+  return {
+    ofe: Math.min(MAX_STAT, stats.ofe + ENCOUNTER_BONUS),
+    def: Math.min(MAX_STAT, stats.def + ENCOUNTER_BONUS),
+    man: Math.min(MAX_STAT, stats.man + ENCOUNTER_BONUS),
+  };
 }

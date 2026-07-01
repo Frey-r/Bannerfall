@@ -35,6 +35,11 @@ interface CombatData {
   rewards: { goldEarned: number; scoreEarned: number };
   returnScene?: string;
   note?: string;
+  /** Título de la cabecera (p. ej. "JEFE FINAL" en un encuentro de run). */
+  title?: string;
+  /** Modo overlay (encuentro de run): al terminar NO cambia de escena, sino que
+   *  invoca este callback para que la escena que la lanzó reanude su flujo. */
+  onDone?: () => void;
 }
 
 /* ---- Unidad visual: sprite + estado + comportamientos --------- */

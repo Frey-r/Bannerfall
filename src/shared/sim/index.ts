@@ -21,6 +21,11 @@ export {
   ACTIVATION_MIN,
   ACTIVATION_MAX,
   CONSEJERO_ABILITY,
+  MOOD_START,
+  MOOD_MIN,
+  MOOD_MAX,
+  nextMood,
+  moodDiceShift,
   calculatePower,
   calculateTier,
   deriveAbilities,
@@ -44,8 +49,17 @@ export {
   eventTurns,
   isEventTurn,
   eventForTurn,
+  ENCOUNTER_COUNT,
+  BOSS_POWER,
+  ENCOUNTER_BONUS,
+  ENCOUNTER_AFTER_TURNS,
+  encounterDefs,
+  encounterAfterTurn,
+  balancedStatsForPower,
+  makeEnemyGeneral,
+  applyEncounterBonus,
 } from './balance.ts';
-export type { BranchingEvent, EventBranch, TrainMod, TrainTurnPlan } from './balance.ts';
+export type { BranchingEvent, EventBranch, TrainMod, TrainTurnPlan, EncounterDef, MoodEvent } from './balance.ts';
 export {
   rollDice,
   rollOdds,

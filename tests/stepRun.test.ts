@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { stepRun, previewTurn } from '../src/shared/sim/stepRun.ts';
 import { simulateRun } from '../src/shared/sim/simulateRun.ts';
-import { eventTurns, RUN_TURNS } from '../src/shared/sim/balance.ts';
+import { eventTurns, RUN_TURNS, applyEncounterBonus } from '../src/shared/sim/balance.ts';
 import { DeckSnapshot, ActionLog, Affinity } from '../src/shared/types/index.ts';
 
 const mockDeck: DeckSnapshot = [
@@ -42,12 +42,13 @@ describe('stepRun (shared turn engine)', () => {
     }
   });
 
-  it('client/server parity: stepRun stats == simulateRun stats', () => {
+  it('client/server parity: stepRun stats (+ boss bonus) == simulateRun stats', () => {
     const seed = 'parity_seed';
     const log = buildLog(seed, 'DEF');
     const stepped = stepRun(seed, mockDeck, log);
     const minted = simulateRun(seed, mockDeck, log);
-    expect(stepped.stats).toEqual(minted.stats);
+    // El acuñado aplica el bono del jefe; el cliente lo reproduce con el mismo helper.
+    expect(applyEncounterBonus(stepped.stats, stepped.bonusEarned)).toEqual(minted.stats);
   });
 
   it('energy drains on train and recovers on rest', () => {

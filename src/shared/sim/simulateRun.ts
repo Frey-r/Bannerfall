@@ -2,7 +2,7 @@ import { DeckSnapshot, ActionLog, General } from '../types/index.ts';
 import { PRNG } from './prng.ts';
 import { stepRun } from './stepRun.ts';
 import { validateActionLog } from './validate.ts';
-import { calculatePower, calculateTier, deriveAbilities, SIM_VERSION } from './balance.ts';
+import { calculatePower, calculateTier, deriveAbilities, applyEncounterBonus, SIM_VERSION } from './balance.ts';
 
 /**
  * Acuña un General re-simulando la run server-side. Toda la lógica de turnos
@@ -25,22 +25,24 @@ export function simulateRun(
     throw new Error(completeness.error || 'Invalid action log');
   }
 
-  const { stats, unlockedAbilities } = stepRun(seed, deckSnapshot, actionLog); // valida cada acción
+  const { stats, unlockedAbilities, bonusEarned } = stepRun(seed, deckSnapshot, actionLog); // valida cada acción
 
   const idp = new PRNG(`${seed}:id`);
   const generalId = `gen_${idp.nextHex(8)}_${idp.nextInt(100000, 999999)}`;
   const resolvedName = name || `General_${seed.substring(0, 4)}_${idp.nextInt(10, 99)}`;
 
-  const finalPower = calculatePower(stats);
+  // Bono final del jefe: +10 a todo si se derrotó al boss (clamp a MAX_STAT).
+  const finalStats = applyEncounterBonus(stats, bonusEarned);
+  const finalPower = calculatePower(finalStats);
   const finalTier = calculateTier(finalPower);
   // Unión: habilidades por umbral de stat + habilidades desbloqueadas por afinidad de consejero.
-  const finalAbilities = Array.from(new Set([...deriveAbilities(stats), ...unlockedAbilities]));
+  const finalAbilities = Array.from(new Set([...deriveAbilities(finalStats), ...unlockedAbilities]));
 
   return {
     id: generalId,
     ownerId: '', // Filled by the server or client context
     name: resolvedName,
-    stats,
+    stats: finalStats,
     power: finalPower,
     tier: finalTier,
     abilities: finalAbilities,
