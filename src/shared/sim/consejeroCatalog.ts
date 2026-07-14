@@ -90,7 +90,7 @@ export interface RunEffectDef {
 export const RUN_EFFECTS: Record<RunEffectId, RunEffectDef> = {
   energiaPrevista: { id: 'energiaPrevista', label: 'Logística Previsora', energyRefund: 6 },
   vinculoFervido: { id: 'vinculoFervido', label: 'Lealtad Fervorosa', bondBonus: 2 },
-  botinDeGuerra: { id: 'botinDeGuerra', label: 'Botín de Guerra', secondaryGain: 3 },
+  botinDeGuerra: { id: 'botinDeGuerra', label: 'Botín de Guerra', secondaryGain: 2 },
   segundaIntencion: { id: 'segundaIntencion', label: 'Segunda Intención', failMaxDelta: -1 },
   ojoCritico: { id: 'ojoCritico', label: 'Ojo Crítico', critMinDelta: -1 },
 };

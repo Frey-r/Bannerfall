@@ -55,6 +55,8 @@ async function start(): Promise<void> {
     /* document.fonts no disponible: continuar igualmente */
   }
   const game = new Phaser.Game(config);
+  // Solo en dev: expone el juego para scripts de verificación (CDP/headless).
+  if (import.meta.env.DEV) (window as unknown as { __game?: Phaser.Game }).__game = game;
 
   // El lienzo toma su posición FINAL después de crear el juego (el CSS lo centra
   // tras el layout/fuentes). Refrescamos los bounds para que `canvasBounds`

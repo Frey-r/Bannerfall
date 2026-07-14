@@ -11,7 +11,7 @@ import {
 import { consejeroDef, RUN_EFFECTS, RunEffectId } from './consejeroCatalog.ts';
 
 /** Versión de simulación. Bump rompe actionLogs/replays previos (ver decisions/0012). */
-export const SIM_VERSION = 3;
+export const SIM_VERSION = 4;
 
 export const BASE_STAT = 10;
 export const MAX_STAT = 100;
@@ -28,7 +28,7 @@ export const REST_GAIN = 45; // energía que recupera un descanso (consume el tu
 /* ---- Riesgo: fallo / crítico ------------------------------------- */
 /** Por encima de este nivel de energía el riesgo de fallo es mínimo. */
 export const SAFE_ENERGY = 55;
-export const CRIT_MULT = 1.8; // multiplicador de ganancia en crítico
+export const CRIT_MULT = 1.5; // multiplicador de ganancia en crítico
 export const EVENT_COUNT = 3; // turnos de evento por run
 
 /* ---- Ánimo (moral): variable de simulación que REFORMA el dado --------
@@ -149,9 +149,11 @@ export function bestAdvisorFor(deck: Consejero[], choice: Affinity): Consejero {
   return candidates.reduce((best, a) => (a.level > best.level ? a : best), candidates[0]);
 }
 
-/** Ganancia base de un entrenamiento (parte determinista, sin outcome). */
+/** Ganancia base de un entrenamiento (parte determinista, sin outcome).
+ *  Presupuesto: con 13 turnos entrenables, el techo (crítico + afín nivel 10 = 15)
+ *  debe permitir maximizar 2 stats y dejar la 3ª a ~mitad, nunca las 3. */
 export function baseGain(advisor: Consejero, choice: Affinity): number {
-  return 5 + (advisor.affinity === choice ? 3 : 0) + advisor.level;
+  return 3 + (advisor.affinity === choice ? 2 : 0) + Math.ceil(advisor.level / 2);
 }
 
 /** Probabilidad de FALLO en función de la energía ANTES de entrenar. */
@@ -240,7 +242,7 @@ export function consejeroTrainMod(c: Consejero, choice: Affinity): TrainMod {
         capTop: false,
         extraDie: false,
         energyRefund: 4 + Math.floor(level / 2),
-        secondaryGain: 1 + Math.floor(level / 4),
+        secondaryGain: 1 + Math.floor(level / 6),
       };
   }
 }
@@ -561,14 +563,14 @@ export function eventForTurn(seed: string, turn: number): BranchingEvent {
    Encuentros de combate — checkpoints deterministas de la run.
    NO son turnos del actionLog: se resuelven en fronteras fijas
    (tras procesar ciertos turnos) comparando las stats ACTUALES
-   contra un enemigo equilibrado. El último es un JEFE de 120 de
-   poder; derrotarlo otorga el bono final de +10 a todo. La
+   contra un enemigo equilibrado. El último es un JEFE de BOSS_POWER
+   de poder; derrotarlo otorga el bono final de +10 a todo. La
    aleatoriedad del combate sale de un PRNG DERIVADO
    (`seed:enc:<frontera>`), así el stream principal no se altera.
    ============================================================ */
 export const ENCOUNTER_COUNT = 4;
-export const BOSS_POWER = 120;
-export const ENCOUNTER_POWERS = [50, 80, 100, BOSS_POWER];
+export const BOSS_POWER = 110;
+export const ENCOUNTER_POWERS = [45, 70, 90, BOSS_POWER];
 export const ENCOUNTER_AFTER_TURNS = [3, 7, 11, RUN_TURNS - 1];
 export const ENCOUNTER_BONUS = 10; // +stat a TODO al derrotar al jefe
 

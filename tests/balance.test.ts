@@ -9,12 +9,18 @@ import {
   activationRamp,
   activationChance,
   activeAdvisorsForTurn,
+  baseGain,
+  gainForBand,
   ACTIVATION_MIN,
   ACTIVATION_MAX,
   RUN_TURNS,
+  EVENT_COUNT,
   BOND_PER_TRAIN,
   BOND_AFFINITY_BONUS,
   SAFE_ENERGY,
+  BASE_STAT,
+  MAX_STAT,
+  ENCOUNTER_BONUS,
 } from '../src/shared/sim/balance.ts';
 import { rollOdds } from '../src/shared/sim/dice.ts';
 import { Affinity, Consejero } from '../src/shared/types/index.ts';
@@ -80,6 +86,25 @@ describe('balance — arquetipos de entrenamiento', () => {
   it('bond rewards on-affinity participation more than off-affinity', () => {
     expect(bondForParticipation(adv('c1', 'OFE', 1), 'OFE')).toBe(BOND_PER_TRAIN + BOND_AFFINITY_BONUS);
     expect(bondForParticipation(adv('c1', 'OFE', 1), 'DEF')).toBe(BOND_PER_TRAIN);
+  });
+});
+
+describe('balance — techo de la run (rolls perfectos + consejeros al máximo)', () => {
+  // Presupuesto: RUN_TURNS - EVENT_COUNT = 13 turnos entrenables; maximizar
+  // una stat cuesta +80 antes del bono del jefe (+10 a todo). El techo con
+  // todo crítico y consejero afín nivel 10 debe permitir maximizar 2 stats
+  // (y dejar la 3ª a ~mitad), nunca las 3.
+  const critMax = gainForBand('CRITICO', baseGain(adv('cmax', 'OFE', 10), 'OFE'));
+  const trainableTurns = RUN_TURNS - EVENT_COUNT;
+  const perStat = MAX_STAT - BASE_STAT - ENCOUNTER_BONUS;
+
+  it('todo crítico permite maximizar 2 stats dentro de los turnos entrenables', () => {
+    const turnsPerStat = Math.ceil(perStat / critMax);
+    expect(2 * turnsPerStat).toBeLessThanOrEqual(trainableTurns);
+  });
+
+  it('todo crítico NO alcanza para maximizar las 3 stats', () => {
+    expect(trainableTurns * critMax).toBeLessThan(3 * perStat);
   });
 });
 

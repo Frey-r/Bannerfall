@@ -92,6 +92,8 @@ export class RunPlayScene extends Phaser.Scene {
   private bonusEarned = false;
   /** Índices de encuentro ya REVELADOS al jugador (no re-mostrar en re-render). */
   private shownEncounters = new Set<number>();
+  /** Encuentro pendiente de pelear: reemplaza las tarjetas por el botón COMBATIR. */
+  private pendingEncounter: EncounterResult | null = null;
   /** Consejeros que ASISTEN este turno (set activo determinista por seed+turno). */
   private activeThisTurn = new Set<string>();
   private busy = false;
@@ -113,6 +115,7 @@ export class RunPlayScene extends Phaser.Scene {
     this.encounters = [];
     this.bonusEarned = false;
     this.shownEncounters = new Set<number>();
+    this.pendingEncounter = null;
     this.activeThisTurn = new Set<string>();
     this.busy = false;
   }
@@ -140,7 +143,11 @@ export class RunPlayScene extends Phaser.Scene {
     this.advisorDeck(c);
     this.liveFeed(c);
 
-    if (this.turn >= RUN_TURNS) {
+    if (this.pendingEncounter) {
+      // Hay un encuentro por pelear: el botón COMBATIR ocupa el lugar de las
+      // tarjetas y el jugador lee el resultado del turno antes de lanzarlo.
+      this.encounterPrompt(c);
+    } else if (this.turn >= RUN_TURNS) {
       this.completion(c);
     } else if (isEventTurn(this.run.seed, this.turn)) {
       this.eventCard(c);
@@ -427,8 +434,8 @@ export class RunPlayScene extends Phaser.Scene {
   private completion(c: Phaser.GameObjects.Container): void {
     const cx = GAME_W / 2;
 
-    // El jefe (4º encuentro) se combate en la VISTA DE BATALLA vía
-    // `maybeShowEncounter`, igual que el resto de encuentros. Hasta que se
+    // El jefe (4º encuentro) se pelea vía el botón COMBATIR (`queueEncounter`
+    // + `encounterPrompt`), igual que el resto de encuentros. Hasta que se
     // resuelva no dibujamos el resumen: así el jugador pelea al jefe ANTES de
     // ver el bono de acuñación.
     const boss = this.encounters.find((e) => e.isBoss);
@@ -473,29 +480,31 @@ export class RunPlayScene extends Phaser.Scene {
   }
 
   private train(choice: Affinity): void {
-    if (this.busy || this.turn >= RUN_TURNS || isEventTurn(this.run.seed, this.turn)) return;
+    if (this.busy || this.pendingEncounter || this.turn >= RUN_TURNS || isEventTurn(this.run.seed, this.turn)) return;
     this.actionLog.push({ kind: 'train', choice });
     const tr = this.recompute(); // el ánimo (this.mood) ya quedó actualizado por la sim
     this.turn += 1;
+    this.queueEncounter(tr.turn);
     this.render();
     this.playDiceThenFeedback(tr);
   }
 
   private rest(): void {
-    if (this.busy || this.turn >= RUN_TURNS || isEventTurn(this.run.seed, this.turn)) return;
+    if (this.busy || this.pendingEncounter || this.turn >= RUN_TURNS || isEventTurn(this.run.seed, this.turn)) return;
     this.actionLog.push({ kind: 'rest' });
     const tr = this.recompute();
     this.turn += 1;
+    this.queueEncounter(tr.turn);
     this.render();
     floatingGain(this, GAME_W / 2, 520, `+${tr.energyAfter - tr.energyBefore} ENERGÍA`, COLORS.lime, 20);
-    this.maybeShowEncounter(tr.turn);
   }
 
   private chooseEvent(branch: 0 | 1): void {
-    if (this.busy || this.turn >= RUN_TURNS || !isEventTurn(this.run.seed, this.turn)) return;
+    if (this.busy || this.pendingEncounter || this.turn >= RUN_TURNS || !isEventTurn(this.run.seed, this.turn)) return;
     this.actionLog.push({ kind: 'event', branch });
     const tr = this.recompute();
     this.turn += 1;
+    this.queueEncounter(tr.turn);
     this.render();
 
     const showOutcome = (): void => {
@@ -507,7 +516,6 @@ export class RunPlayScene extends Phaser.Scene {
       outcomeBanner(this, tr.event.name, col, negative);
       toast(this, tr.event.outcomeText, col);
       this.showStatDeltas(tr);
-      this.maybeShowEncounter(tr.turn);
     };
 
     if (tr.dice) {
@@ -536,14 +544,12 @@ export class RunPlayScene extends Phaser.Scene {
           this.busy = false;
           this.showTrainFeedback(tr);
           this.flashUnlocks(tr);
-          this.maybeShowEncounter(tr.turn);
         },
       });
       this.roller.roll(tr.dice);
     } else {
       this.showTrainFeedback(tr);
       this.flashUnlocks(tr);
-      this.maybeShowEncounter(tr.turn);
     }
   }
 
@@ -591,15 +597,52 @@ export class RunPlayScene extends Phaser.Scene {
   }
 
   /* ---- Encuentros de combate (vista de batalla 6v6) ------------ */
-  /** Presenta el encuentro resuelto tras `turnDone` en la vista de combate (una sola vez).
-   *  Incluye al jefe: se pelea antes de acuñar y, al cerrar, re-renderiza el resumen. */
-  private maybeShowEncounter(turnDone: number): void {
+  /** Encola el encuentro resuelto tras `turnDone` (una sola vez): NO lanza el
+   *  combate; el render lo presenta como botón COMBATIR para que el jugador
+   *  lea el resultado del turno antes de pelear. Incluye al jefe. */
+  private queueEncounter(turnDone: number): void {
     const enc = this.encounters.find(
       (e) => e.afterTurn === turnDone && !this.shownEncounters.has(e.index)
     );
     if (!enc) return;
     this.shownEncounters.add(enc.index);
-    this.launchEncounterCombat(enc, enc.isBoss ? () => this.render() : undefined);
+    this.pendingEncounter = enc;
+  }
+
+  /** Reemplaza la zona de tarjetas por el aviso del encuentro + botón COMBATIR. */
+  private encounterPrompt(c: Phaser.GameObjects.Container): void {
+    const enc = this.pendingEncounter;
+    if (!enc) return;
+    const cx = GAME_W / 2;
+
+    // El bloque arranca en y=990 para no pisar el dado del turno (y≈880 + etiqueta).
+    c.add(
+      titleText(
+        this,
+        cx,
+        990,
+        enc.isBoss ? '¡JEFE FINAL!' : `¡ENCUENTRO ${enc.index + 1} / ${ENCOUNTER_COUNT}!`,
+        18,
+        COLORS.danger
+      )
+    );
+    c.add(bodyText(this, cx, 1022, `${enc.enemyName} · PODER ${enc.enemyPower}`, 15, COLORS.cream));
+    c.add(bodyText(this, cx, 1054, 'El enemigo bloquea el paso. Pelea cuando estés listo.', 14, COLORS.gold));
+    c.add(
+      retroButton(this, cx, 1140, 'COMBATIR', {
+        variant: 'maroon',
+        width: CONTENT_W,
+        height: 90,
+        fontSize: 20,
+        onClick: () => {
+          if (this.busy || !this.pendingEncounter) return;
+          this.launchEncounterCombat(this.pendingEncounter, () => {
+            this.pendingEncounter = null;
+            this.render();
+          });
+        },
+      })
+    );
   }
 
   /** Lanza la escena PvpCombat como overlay para VISUALIZAR la batalla del

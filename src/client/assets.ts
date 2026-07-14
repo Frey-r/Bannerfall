@@ -68,7 +68,7 @@ import regularPaper from './assets/sprites/UI Elements/UI Elements/Papers/Regula
 import specialPaper from './assets/sprites/UI Elements/UI Elements/Papers/SpecialPaper.png';
 import banner from './assets/sprites/UI Elements/UI Elements/Banners/Banner.png';
 import dicesSprite from './assets/sprites/UI Elements/UI Dices/dices_sprite.png';
-import backgroundMusic from './assets/music/backgroud music.mp3';
+import backgroundMusic from './assets/music/background-music.mp3';
 
 export const PANEL = {
   paper: regularPaper,
