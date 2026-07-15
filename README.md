@@ -1,239 +1,167 @@
 # Bannerfall
 
-> Forja generales en *runs* de entrenamiento, llévalos a una arena PvP asíncrona de fantasmas
-> y escala tu asentamiento entre partidas. Un juego de táctica por turnos construido sobre
-> **Reddit Devvit**, donde cada resultado es **determinista, reproducible y verificado por el servidor**.
+> Forge unique generals in seeded training **runs**, send them into an **asynchronous ghost
+> arena**, and grow your settlement between battles. A turn-based tactics game built on
+> **Reddit Devvit**, where every outcome is **deterministic, reproducible, and server-verified**.
 
-App de Devvit: **`tiny-tacticians`** · Cliente **Phaser 4** · Servidor **Devvit Web (Express 5)** · Estado en **Redis gestionado**.
+**Devvit app:** `tiny-tacticians` · **Client:** Phaser 4 · **Server:** Devvit Web (Express 5) · **State:** managed Redis
 
----
-
-## ⏱️ Del primer commit al cierre de la jam
-
-| Hito | Fecha |
-|------|-------|
-| **Inicio del proyecto** (primer commit) | `2026-06-22` |
-| **Cierre de la hackatón** (fecha límite de entrega) | `2026-07-15` |
-| **Ventana total de la jam** | **≈ 23 días** (del 22 de junio al 15 de julio de 2026) |
-
-Todo el sistema —motor determinista, anti-cheat estructural, PvP asíncrono, meta-progresión,
-eventos diarios por scheduler, 9 escenas de Phaser y una suite de 13 conjuntos de pruebas— se
-diseña, especifica e implementa dentro de esa ventana de ~23 días. *(El primer commit cargó el
-andamiaje el 22 de junio; el desarrollo continúa hasta la entrega del 15 de julio.)*
+> **Play it now:** open the demo post (linked on the Devpost submission) and press **Play**.
+> New players are dropped straight into a guided first run — no reading required.
 
 ---
 
-## 🎯 Propósito
+## 🎯 What is Bannerfall?
 
-Bannerfall responde a una pregunta de diseño concreta: **¿cómo se construye un juego competitivo
-multijugador sobre una webview no confiable, sin netcode en tiempo real y sin que el cliente pueda
-hacer trampa?**
+Bannerfall is a competitive, community-driven tactics game that lives inside a Reddit post.
+You don't fight in real time — you **forge a general** through a short training run, and that
+general becomes a **ghost** that other redditors in your community will face in the arena. Every
+player who plays seeds opponents for everyone else, and a shared leaderboard and a daily challenge
+give the community a reason to come back each day.
 
-La respuesta es el corazón del proyecto: un **motor de simulación determinista compartido** entre
-cliente y servidor. El cliente lo usa para que la partida se sienta instantánea (sin un round-trip
-por turno); el servidor lo re-ejecuta como **única fuente de verdad**. Inflar stats es
-estructuralmente imposible: la semilla y el mazo salen del servidor, y el resultado se vuelve a
-simular byte a byte.
-
-Sobre esa base se monta un bucle de juego completo pensado para una comunidad de Reddit:
-
-- **Asíncrono por diseño** — el PvP enfrenta a *fantasmas* (generales guardados de otros jugadores).
-  No hay sincronía en vivo: una batalla se reduce a `(seed, generalA, generalB)` reproducible.
-- **Cold-start resuelto** — si no hay rival humano en tu banda de poder, entras contra un NPC
-  sembrado, así una comunidad recién creada nunca se queda sin oponente.
-- **Retención diaria** — un reto diario generado por cron entrega recursos y contratos de
-  reclutamiento, dando una razón para volver cada día.
+Under the hood it answers one design question: *how do you build a fair competitive multiplayer
+game on top of an untrusted webview, with no real-time netcode and no way for the client to cheat?*
+The answer is a **shared deterministic simulation engine** — the client runs it so the game feels
+instant, and the server re-runs it as the single source of truth. Inflating your stats is
+structurally impossible: the seed and deck come from the server, and every result is re-simulated.
 
 ---
 
-## 🕹️ Bucle de juego
+## 🕹️ How to Play
+
+**First time?** Just press **Play**. A short cinematic and a guided tutorial run teach the loop
+in about a minute. After that, the full loop is:
+
+1. **Run a training session.** You get **8 turns**. Each turn you can:
+   - **Train** an affinity (Offense / Defense / Command) by assigning one of your advisors.
+   - **Rest** to recover energy.
+   - **Resolve an event** that pops up during the run.
+   Every training roll and event branch is decided by **seeded dice** → **FAIL / NORMAL / CRITICAL**.
+   Advisors reshape the odds and can bond with your recruit to unlock a combat ability.
+2. **Mint a General.** When the run ends, the server re-simulates your actions and mints an
+   **immutable General** with its own stats, tier, power, and abilities. It's yours forever.
+3. **Enter the Arena (PvP).** Send a general into matchmaking. You're paired against a **ghost**
+   (a saved general from another player in your power band) — or a seeded NPC if the pool is empty,
+   so a brand-new community is never left without an opponent. The battle resolves deterministically,
+   round by round, and rewards are credited atomically.
+4. **Grow between battles.** Spend gold to level up advisors and your settlement, and recruit new
+   advisors via **contracts** (permanent unlocks) or the **daily loan** (a temporary 24h advisor).
+5. **Come back tomorrow.** A **daily challenge** (generated by a scheduled job) hands out resources
+   and a recruitment contract, and the **leaderboard** tracks who's climbing.
+
+### Quick glossary
+
+| Term | Meaning |
+|------|---------|
+| **General** | The collectible, **immutable** unit you mint at the end of a run; fights in PvP. |
+| **Advisor** | A mentor with an affinity (**OFE** offense · **DEF** defense · **MAN** command) you assign to training; adds dice modifiers and can unlock an ability via bond. |
+| **Bond** | Affinity built with an advisor **during a run**; crossing a threshold grants their ability to the minted general. |
+| **Run** | An 8-turn training session that produces one general. |
+| **Ghost** | Another player's saved general, used as your opponent in async PvP. |
+| **Contract** | A colored voucher (red/OFE, blue/DEF, purple/MAN, white wildcard) redeemed for a permanent advisor; handed out by daily challenges. |
+| **Daily loan** | A random advisor loaned for 24h (not a permanent unlock). |
+
+---
+
+## 🪝 The Hook (why you come back)
+
+- **Async ghost PvP** — every general you mint becomes an opponent for the rest of the community.
+  The more people play, the richer everyone's arena gets. Your play *is* the content.
+- **Daily challenge** — a fresh, scheduler-generated objective each day with resources and a
+  recruitment contract on the line.
+- **Leaderboard + power bands** — climb against real players near your strength.
+- **Meta-progression** — persistent gold, advisor levels, settlement upgrades, and a growing roster
+  give long-term goals beyond any single battle.
+
+---
+
+## ✨ Key features
+
+- **Shared deterministic engine** (`src/shared/sim`): seeded PRNG + pure `simulateRun` and
+  `simulateBattle`. No `Math.random`, no `Date.now`, no global state.
+- **Authoritative server / structural anti-cheat**: the client only transmits bounded intent
+  (`actionLog`); anything touching PvP, the leaderboard, or the economy is recomputed server-side.
+- **Immutable generals**: once minted, a general never changes, which removes almost all race
+  conditions. Counters use atomic Redis ops, never read-modify-write.
+- **End-to-end idempotency**: every state-mutating endpoint requires an idempotency token, so flaky
+  mobile retries never duplicate generals, rewards, or score.
+- **Ghost PvP + NPC fallback**: power-band matchmaking that excludes your own generals and re-pairs
+  around expired opponents instead of failing.
+- **Scheduled daily events**: an idempotent daily challenge (with lazy creation if the cron misses)
+  that awards a contract whose color depends on the day's modifier.
+- **Forward compatibility**: every persisted entity carries a schema version; legacy reads get
+  safe defaults so users never break across updates.
+
+---
+
+## 🏗️ Architecture (for the curious)
+
+The integrity boundary is the founding decision: the **same simulation code** ships to both sides,
+and the client never has authority.
 
 ```
-        ┌─────────────────────────────────────────────────────────────┐
-        │                                                             │
-        ▼                                                             │
-  CORRER RUN ──► entrenas 8 turnos con dados sembrados ──► ENVÍAS    │
-  (el servidor                y consejeros del mazo          actionLog │
-   emite seed + deck)                                            │     │
-                                                                ▼     │
-                                              EL SERVIDOR RE-SIMULA   │
-                                              y ACUÑA un GENERAL      │
-                                              inmutable y autoritativo │
-                                                                │     │
-                          ┌─────────────────────────────────────┘     │
-                          ▼                                            │
-                    PvP / ARENA ──► batalla determinista vs fantasma   │
-                    (matchmaking      o NPC ──► recompensas atómicas    │
-                     por banda                  + leaderboard           │
-                     de poder)                       │                  │
-                                                     ▼                  │
-                                         META-PROGRESIÓN ───────────────┘
-                                         (oro, subir consejeros,
-                                          asentamiento, reclutar)
+   CLIENT (untrusted webview)                   SERVER (source of truth)
+   ──────────────────────────────              ──────────────────────────────
+   simulateRun(seed, deck, log)  ── previews ──►  emits seed + deck
+   simulateBattle(seed, A, B)    ── animates ──►  RE-SIMULATES & mints/resolves
+                                                   persists to Redis (atomic)
+                  ▲                                          │
+                  └──────────── same @shared package ────────┘
 ```
 
-1. **Run de entrenamiento.** El servidor te entrega una `seed` y el `deckSnapshot` de tu loadout.
-   Durante 8 turnos eliges **entrenar** una afinidad (asignando consejeros del mazo), **descansar**
-   para recuperar energía, o resolver un **evento** de campaña. Cada entrenamiento y cada rama
-   probabilística se resuelve con dados sembrados → banda **FALLO / NORMAL / CRÍTICO**.
-2. **Acuñación.** Al enviar tu `actionLog`, el servidor lo re-simula y acuña un **General inmutable**
-   con stats, *tier*, poder y habilidades autoritativas. Las habilidades pueden venir de cruzar
-   umbrales de stat **o** del *bond* (afinidad) acumulado con un consejero durante la run.
-3. **Arena PvP.** Tu general entra a un *matchmaking por banda de poder* contra fantasmas de otros
-   jugadores (o un NPC si el pool está vacío). El servidor resuelve la batalla ronda a ronda de
-   forma determinista y acredita recompensas de forma **atómica e idempotente**.
-4. **Meta-progresión.** Gastas oro para subir consejeros y tu asentamiento, y reclutas nuevos
-   consejeros vía **contratos** (desbloqueo permanente) o el **préstamo diario** (temporal, 24 h).
+| Layer | Path | Responsibility |
+|-------|------|----------------|
+| **Shared / Sim** | `src/shared/sim` | PRNG, dice, `simulateRun`, `simulateBattle`, balance, validation — the deterministic engine. |
+| **Server** | `src/server` | Express 5 on Devvit Web. Run / PvP / daily / meta / recruitment routes; general minting, matchmaking, NPC, rewards, idempotency, rate-limit, and the Devvit gRPC proxy. |
+| **Client** | `src/client` | Phaser 4 scenes (Boot, Home, RunSetup, RunPlay, Pvp, PvpCombat, Collection, Events, Recruitment, Intro), custom theme/widgets/terrain, and the API layer. |
+
+The project follows a **spec-driven** methodology: `specs/*.spec.md` are the behavioral contract
+(GIVEN/WHEN/THEN), and `decisions/*.md` (ADRs) record the *how* (Redis keys, concurrency, TTLs).
 
 ---
 
-## ✨ Características clave
+## 🧰 Tech stack
 
-- **Motor determinista compartido** (`src/shared/sim`): PRNG sembrado + funciones puras
-  `simulateRun` y `simulateBattle`. Sin `Math.random`, sin `Date.now`, sin estado global.
-- **Servidor autoritativo / anti-cheat estructural**: el cliente solo transmite intenciones
-  acotadas (`actionLog`); todo resultado que toque PvP, leaderboard o economía se recomputa.
-- **Generales inmutables**: una vez acuñados nunca cambian, lo que elimina casi todas las
-  condiciones de carrera. Los contadores usan ops atómicas de Redis, no read-modify-write.
-- **Idempotencia de extremo a extremo**: todo endpoint que muta estado exige token de idempotencia;
-  los reintentos por red móvil inestable no duplican generales, recompensas ni puntuación.
-- **Dados restringidos y modificadores puros**: los consejeros y la energía reforman la tirada
-  (`DiceRoll → DiceRoll`) moviendo umbrales y añadiendo dados de ventaja, con cotas seguras.
-- **PvP de fantasmas + fallback NPC**: matchmaking por banda de poder con exclusión de generales
-  propios y manejo de oponentes caducados (re-emparejamiento en lugar de fallar).
-- **Eventos diarios por scheduler**: reto del día idempotente (con *lazy creation* si el cron
-  falla) que entrega un **contrato** cuyo color depende del modificador del día.
-- **Compatibilidad hacia adelante**: toda entidad persistida lleva versión de esquema; al leer
-  datos legados se aplican defaults sin romper al usuario.
+- **Platform:** Reddit **Devvit Web** (`@devvit/web`, `@devvit/public-api`)
+- **Client:** **Phaser 4** + **TypeScript**, bundled with **Vite 6**
+- **Server:** **Express 5** running inside the Devvit runtime
+- **State:** Devvit-**managed Redis** (atomic ops; nothing to host)
+- **Tests:** **Vitest** (includes engine determinism tests)
 
 ---
 
-## 🏗️ Arquitectura
+## 🚀 Running it locally
 
-El proyecto se rige por una metodología **spec-driven** (estilo OpenSpec): las `specs/*.spec.md`
-son el **contrato de comportamiento** (qué se observa, en formato GIVEN/WHEN/THEN), y las
-`decisions/*.md` (ADRs) registran el **cómo** (claves Redis, concurrencia, TTL).
-
-### Límite de integridad (la decisión fundacional — [ADR-0001](decisions/0001-deterministic-simulation-engine.md))
-
-```
-   CLIENTE (webview no confiable)              SERVIDOR (fuente de verdad)
-   ──────────────────────────────             ──────────────────────────────
-   simulateRun(seed, deck, log)  ── previsualiza ──►  emite seed + deck
-   simulateBattle(seed, A, B)    ── anima ─────────►  RE-SIMULA y acuña/resuelve
-                                                       persiste en Redis (atómico)
-                  ▲                                              │
-                  └──────────── mismo paquete @shared ───────────┘
-```
-
-El **mismo código** viaja a ambos lados; el cliente nunca tiene autoridad. Esto da anti-cheat
-estructural y un PvP asíncrono barato, a costa de una restricción dura: el motor **debe** ser
-determinista, garantizado por una suite de pruebas que falla ante cualquier deriva.
-
-### Capas
-
-| Capa | Ruta | Responsabilidad |
-|------|------|-----------------|
-| **Shared / Sim** | `src/shared/sim` | PRNG, dados, `simulateRun`, `simulateBattle`, balance, validación. El motor determinista. |
-| **Server** | `src/server` | Express 5 sobre Devvit Web. Rutas de run, PvP, daily, meta, reclutamiento; core de generales, matchmaking, NPC, recompensas, idempotencia, rate-limit y proxy gRPC de Devvit. |
-| **Client** | `src/client` | 9 escenas de Phaser 4 (Boot, Home, RunSetup, RunPlay, Pvp, PvpCombat, Collection, Eventos, Reclutamiento), tema/widgets/terreno propios y capa de API. |
-
----
-
-## 🧰 Stack tecnológico
-
-- **Plataforma:** Reddit **Devvit Web** (`@devvit/web`, `@devvit/public-api`)
-- **Cliente:** **Phaser 4.2** + **TypeScript**, bundleado con **Vite 6**
-- **Servidor:** **Express 5** (beta) ejecutado dentro del runtime de Devvit
-- **Estado:** **Redis gestionado** por Devvit (ops atómicas; nada que hostear)
-- **Pruebas:** **Vitest 3** (13 suites; incluye pruebas de determinismo del motor)
-- **Runtime de scripts:** **Bun** para el dev server
-
----
-
-## 📁 Estructura del repositorio
-
-```
-Bannerfall/
-├─ src/
-│  ├─ shared/sim/      # Motor determinista: prng, dice, simulateRun, simulateBattle, balance, validate
-│  ├─ server/          # Devvit Web (Express): routes/ + core/ + devvitProxy/
-│  └─ client/          # Phaser: scenes/ + ui/ + api/state
-├─ specs/              # Contratos de comportamiento (GIVEN/WHEN/THEN) por capability
-├─ decisions/          # ADRs: motor determinista, conexiones, concurrencia, Redis, idempotencia…
-├─ mockups/            # Wireframes ASCII de cada pantalla (home, pvp, colección, eventos, run-setup)
-├─ tests/              # 13 suites Vitest (determinismo, balance, recompensas, daily, rate-limit…)
-├─ scripts/dev.mjs     # Dev server (Bun)
-└─ AGENTS.md           # Guía y reglas de oro para asistentes de IA
-```
-
-### Capabilities especificadas (`specs/`)
-
-| Spec | Qué cubre |
-|------|-----------|
-| [`simulation-engine`](specs/simulation-engine.spec.md) | Determinismo del PRNG, `simulateRun`, `simulateBattle`, seguridad numérica acotada. |
-| [`dice-resolution`](specs/dice-resolution.spec.md) | Dados sembrados, dados restringidos, modificadores como transformaciones puras. |
-| [`run-training`](specs/run-training.spec.md) | Ciclo start → submit → acuñar; asignación de consejeros, bond y desbloqueo de habilidades. |
-| [`combat-pvp`](specs/combat-pvp.spec.md) | Matchmaking por banda, fallback NPC, resolución determinista, recompensas atómicas. |
-| [`meta-progression`](specs/meta-progression.spec.md) | Ledger de oro, niveles de consejero/asentamiento, reclutamiento, versionado de esquema. |
-| [`daily-events`](specs/daily-events.spec.md) | Reto diario por cron, *lazy creation*, reclamo idempotente, contrato por color. |
-| [`security`](specs/security.spec.md) | Autoridad de servidor, autorización/ownership, idempotencia, validación, rate-limit. |
-
----
-
-## 📖 Glosario del juego
-
-- **General** — la unidad coleccionable e **inmutable** que acuñas al terminar una run; combate en PvP.
-- **Consejero** — mentor con una **afinidad** (`OFE` ofensiva · `DEF` defensa · `MAN` mando) que asignas
-  a los entrenamientos; aporta modificadores al dado y puede desbloquear una habilidad por *bond*.
-- **Bond** — afinidad acumulada con un consejero **durante una run** (no se persiste); al cruzar un
-  umbral, su habilidad de combate se une al general acuñado.
-- **Run** — sesión de 8 turnos de entrenamiento que produce un general.
-- **Fantasma** — general guardado de otro jugador, usado como oponente en el PvP asíncrono.
-- **Contrato** — vale de color (rojo/`OFE`, azul/`DEF`, morado/`MAN`, blanco comodín) que canjeas
-  por un consejero permanente; lo entregan los retos diarios.
-- **Préstamo diario** — consejero aleatorio prestado por 24 h (no es desbloqueo permanente).
-
----
-
-## 🚀 Puesta en marcha
-
-> Requiere una cuenta de Reddit con acceso a Devvit. En Windows, la CLI se invoca vía Node
-> (el shim de Bun puede fallar): `node node_modules/devvit/bin/devvit.js …` (alias en `package.json`).
+> Requires a Reddit account with Devvit access. On Windows, invoke the CLI via Node
+> (the Bun shim can fail): `node node_modules/devvit/bin/devvit.js …` (aliased in `package.json`).
 
 ```bash
-# Instalar dependencias
-npm install
+npm install          # install dependencies
+npm test             # run the test suite (includes engine determinism — must pass)
 
-# Pruebas (incluye el determinismo del motor — debe pasar antes de dar por cerrado un cambio)
-npm test
+npm run dev          # full dev server (client + server)
+npm run dev:client   # client only (Vite)
+npm run dev:server   # server only (hot reload)
 
-# Desarrollo local (cliente + servidor)
-npm run dev          # dev server completo (Bun)
-npm run dev:client   # solo cliente (Vite)
-npm run dev:server   # solo servidor (hot reload)
+npm run build        # production build (client + server)
 
-# Build de producción (cliente + servidor)
-npm run build
-
-# Devvit
-npm run login        # autenticarse en Devvit
-npm run upload       # subir la app
-npm run playtest     # playtest en un subreddit
+npm run login        # authenticate with Devvit
+npm run upload       # upload the app
+npm run playtest     # playtest in a subreddit
 ```
 
-### Reglas de oro para contribuir (ver [`AGENTS.md`](AGENTS.md))
+### Contributor golden rules (see [`AGENTS.md`](AGENTS.md))
 
-1. **El cliente no tiene autoridad.** Cualquier salida que afecte PvP, leaderboard o economía se
-   recomputa o re-simula en el servidor.
-2. **Determinismo.** El motor no usa `Math.random`, `Date.now` ni estado global. Todo lo aleatorio
-   sale del PRNG sembrado.
-3. **Generales inmutables.** Una vez acuñado, un general nunca se modifica. Para contadores, ops
-   atómicas de Redis, no read-modify-write.
-4. **Idempotencia.** Todo endpoint que muta estado exige un token de idempotencia.
-5. Las **specs** describen el *qué*; los **ADRs** el *cómo*. No mezcles detalle de implementación
-   en las specs. Antes de cerrar: las pruebas de determinismo del `simulation-engine` deben estar verdes.
+1. **The client has no authority.** Anything affecting PvP, the leaderboard, or the economy is
+   recomputed or re-simulated on the server.
+2. **Determinism.** The engine uses no `Math.random`, no `Date.now`, no global state — all
+   randomness comes from the seeded PRNG.
+3. **Immutable generals.** Once minted, a general is never modified. Use atomic Redis ops for
+   counters, not read-modify-write.
+4. **Idempotency.** Every state-mutating endpoint requires an idempotency token.
+5. **Specs describe the *what*; ADRs the *how*.** Engine determinism tests must be green before
+   any change is considered done.
 
 ---
 
-<sub>Construido para una hackatón del 22 de junio al 15 de julio de 2026 · App de Devvit `tiny-tacticians`.</sub>
+<sub>Built for Reddit's Games with a Hook Hackathon (June–July 2026) · Devvit app `tiny-tacticians`.</sub>

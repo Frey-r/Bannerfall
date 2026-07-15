@@ -25,7 +25,9 @@ export async function isCurrentUserModerator(userId: string): Promise<boolean> {
 
 // KILLSWITCH: Si se cambia a `true`, fuerza el evento de primera run (tutorial/intro)
 // para todos los moderadores sin importar el valor del panel de configuración de Devvit.
-export const FORCE_FIRST_RUN_KILLSWITCH = true;
+// Debe quedar en `false` para la entrega: el onboarding de usuarios nuevos ya se detecta
+// server-side vía `onboardedAt`; este killswitch solo re-fuerza el flujo a moderadores.
+export const FORCE_FIRST_RUN_KILLSWITCH = false;
 
 /**
  * Retrieves a boolean setting safely. Fallbacks to Redis in local dev.
